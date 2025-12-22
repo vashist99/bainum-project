@@ -259,6 +259,14 @@ Main/
 - Check that passwords are correctly hashed in database
 - Clear browser localStorage and try again
 
+## 📄 License
+
+[Specify your license here]
+
+## 👥 Contributors
+
+[Add contributors here]
+
 ## 📧 Contact
 
 vashisthegde@ufl.edu
