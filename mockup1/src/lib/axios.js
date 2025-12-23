@@ -12,6 +12,8 @@ const isDevelopment = import.meta.env.DEV || window.location.hostname === 'local
 // In production, use the VITE_API_URL if set, otherwise empty (relative URLs)
 const API_BASE_URL = isDevelopment ? '' : (import.meta.env.VITE_API_URL || '');
 
+console.log("API_BASE_URL", API_BASE_URL);
+
 // Create axios instance with base URL
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
