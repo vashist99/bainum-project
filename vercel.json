@@ -8,7 +8,7 @@
       {
         "src": "mockup1/package.json",
         "use": "@vercel/static-build",
-        "config": { "distDir": "dist" }
+        "config": { "distDir": "build" }
       }
     ],
     "rewrites": [
