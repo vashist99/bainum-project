@@ -15,7 +15,7 @@
     "rewrites": [
       {
         "source": "/api/(.*)",
-        "destination": "/backend/src/server.js"
+        "destination": "https://bainum-project.vercel.app/"
       },
       {
         "source": "/(.*)",
