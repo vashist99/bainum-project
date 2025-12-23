@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
 import { Plus, Edit, Trash2, ChevronDown, ChevronRight, User, Mail, X } from "lucide-react";
-import axios from "axios";
+import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 

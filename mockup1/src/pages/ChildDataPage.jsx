@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
 import { ArrowLeft, User, Calendar, Languages, Stethoscope, Users, FileText, BookOpen, MessageCircle, Microscope, Brain, Plus, Trash2, Upload, Mic, Check, X, Download } from "lucide-react";
-import axios from "axios";
+import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 import ReactSpeedometer, { CustomSegmentLabelPosition } from "react-d3-speedometer";

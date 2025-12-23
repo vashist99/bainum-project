@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
-import axios from "axios";
+import axios from "../lib/axios";
 
 const AddChildForm = () => {
   const navigate = useNavigate();
