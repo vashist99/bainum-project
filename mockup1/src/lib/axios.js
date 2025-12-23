@@ -48,6 +48,37 @@ const apiClient = axios.create({
   // This allows multipart/form-data to work correctly
 });
 
+// Add request interceptor to automatically attach JWT token
+apiClient.interceptors.request.use(
+  (config) => {
+    // Get token from localStorage
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        // Parse the stored value (could be a string or JSON string)
+        let token = savedUser;
+        try {
+          token = JSON.parse(savedUser);
+        } catch (e) {
+          // If parsing fails, it's already a string
+          token = savedUser;
+        }
+        
+        // Add Authorization header if token exists
+        if (token && typeof token === 'string') {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      } catch (error) {
+        console.error('Error parsing token from localStorage:', error);
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Export both the configured instance and the original axios for flexibility
 export default apiClient;
 export { axios as axiosOriginal };
