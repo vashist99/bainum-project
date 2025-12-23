@@ -15,17 +15,17 @@ const isDevelopment = import.meta.env.DEV ||
 const envApiUrl = import.meta.env.VITE_API_URL;
 
 // Determine the base URL:
-// Priority 1: If VITE_API_URL is explicitly set, always use it (for production)
-// Priority 2: If in development and no VITE_API_URL, use empty string (leverages Vite proxy)
+// Priority 1: If in development, ALWAYS use empty string (leverages Vite proxy) - ignore VITE_API_URL
+// Priority 2: If in production and VITE_API_URL is set, use it
 // Priority 3: If in production and no VITE_API_URL, warn and use empty (will fail, but won't break)
 let API_BASE_URL = '';
 
-if (envApiUrl) {
-  // Environment variable is set - use it (remove trailing slash if present)
-  API_BASE_URL = envApiUrl.replace(/\/$/, '');
-} else if (isDevelopment) {
-  // Development mode without env var - use Vite proxy
+if (isDevelopment) {
+  // Development mode - ALWAYS use Vite proxy, ignore VITE_API_URL
   API_BASE_URL = '';
+} else if (envApiUrl) {
+  // Production mode with env var - use it (remove trailing slash if present)
+  API_BASE_URL = envApiUrl.replace(/\/$/, '');
 } else {
   // Production mode without env var - this is an error, but use empty to prevent breaking
   console.error('⚠️ VITE_API_URL is not set in production! API requests will fail.');
