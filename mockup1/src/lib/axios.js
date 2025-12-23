@@ -6,13 +6,40 @@ import axios from 'axios';
 // Vite requires environment variables to be prefixed with VITE_ to be accessible in the browser
 
 // Check if we're in development mode (localhost)
-const isDevelopment = import.meta.env.DEV || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isDevelopment = import.meta.env.DEV || 
+                      window.location.hostname === 'localhost' || 
+                      window.location.hostname === '127.0.0.1' ||
+                      window.location.hostname === '';
 
-// In development, use empty baseURL to leverage Vite proxy
-// In production, use the VITE_API_URL if set, otherwise empty (relative URLs)
-const API_BASE_URL = isDevelopment ? '' : (import.meta.env.VITE_API_URL || '');
+// Get the API URL from environment variable
+const envApiUrl = import.meta.env.VITE_API_URL;
 
-console.log("API_BASE_URL", API_BASE_URL);
+// Determine the base URL:
+// Priority 1: If VITE_API_URL is explicitly set, always use it (for production)
+// Priority 2: If in development and no VITE_API_URL, use empty string (leverages Vite proxy)
+// Priority 3: If in production and no VITE_API_URL, warn and use empty (will fail, but won't break)
+let API_BASE_URL = '';
+
+if (envApiUrl) {
+  // Environment variable is set - use it (remove trailing slash if present)
+  API_BASE_URL = envApiUrl.replace(/\/$/, '');
+} else if (isDevelopment) {
+  // Development mode without env var - use Vite proxy
+  API_BASE_URL = '';
+} else {
+  // Production mode without env var - this is an error, but use empty to prevent breaking
+  console.error('⚠️ VITE_API_URL is not set in production! API requests will fail.');
+  API_BASE_URL = '';
+}
+
+// Log for debugging
+console.log("API Configuration:", {
+  isDevelopment,
+  envApiUrl: envApiUrl || '(not set)',
+  API_BASE_URL: API_BASE_URL || '(using relative URLs)',
+  hostname: window.location.hostname,
+  mode: import.meta.env.MODE
+});
 
 // Create axios instance with base URL
 const apiClient = axios.create({
