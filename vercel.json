@@ -21,6 +21,9 @@
         "source": "/(.*)",
         "destination": "/mockup1/index.html"
       }
-    ]
+    ],
+    "env": {
+      "VITE_API_URL": "https://bainum-project.vercel.app/"
+    }
   }
   
