@@ -1,11 +1,8 @@
 {
   "buildCommand": "cd mockup1 && npm install && npm run build",
   "outputDirectory": "mockup1/dist",
-  "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
