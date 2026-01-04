@@ -1,29 +1,11 @@
 {
-    "version": 2,
-    "outputDirectory": "dist",
-    "builds": [
-      {
-        "src": "backend/api/index.js",
-        "use": "@vercel/node"
-      },
-      {
-        "src": "mockup1/package.json",
-        "use": "@vercel/static-build",
-        "config": { "distDir": "dist" }
-      }
-    ],
-    "rewrites": [
-      {
-        "source": "/api/(.*)",
-        "destination": "https://bainum-project.vercel.app/"
-      },
-      {
-        "source": "/(.*)",
-        "destination": "/mockup1/index.html"
-      }
-    ],
-    "env": {
-      "VITE_API_URL": "https://bainum-project.vercel.app/"
+  "buildCommand": "cd mockup1 && npm install && npm run build",
+  "outputDirectory": "mockup1/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
-  }
-  
+  ]
+}
