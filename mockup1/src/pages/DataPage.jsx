@@ -10,21 +10,9 @@ const DataPage = () => {
   const navigate = useNavigate();
   const { user, isTeacher, isParent, isAdmin } = useAuth();
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/8ed3ab10-f37b-4a7f-b1ef-b646b3b66295',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DataPage.jsx:9',message:'DataPage component mounted',data:{pathname:window.location.pathname,userRole:user?.role,isParent:isParent(),hasChildId:!!user?.childId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  }, []);
-  // #endregion
-
   // Redirect parents to their child's page
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/8ed3ab10-f37b-4a7f-b1ef-b646b3b66295',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DataPage.jsx:15',message:'Parent redirect check',data:{isParent:isParent(),hasChildId:!!user?.childId,childId:user?.childId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     if (isParent() && user?.childId) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/8ed3ab10-f37b-4a7f-b1ef-b646b3b66295',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DataPage.jsx:17',message:'Redirecting parent to child page',data:{targetPath:`/data/child/${user.childId}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       navigate(`/data/child/${user.childId}`, { replace: true });
     }
   }, [isParent, user, navigate]);
