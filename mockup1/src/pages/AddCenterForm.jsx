@@ -50,7 +50,7 @@ const AddCenterForm = () => {
 
     try {
       // Make API call to create center in database
-      const response = await axios.post("/api/centers", formData);
+      await axios.post("/api/centers", formData);
 
       toast.success("Center added successfully!");
 

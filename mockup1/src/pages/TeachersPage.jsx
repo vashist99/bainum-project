@@ -8,7 +8,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 const TeachersPage = () => {
   const navigate = useNavigate();
-  const { isAdmin, user } = useAuth();
+  const { isAdmin } = useAuth();
   const [teachers, setTeachers] = useState([]);
   const [children, setChildren] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,6 @@ const TeachersPage = () => {
           console.error("Error fetching children:", error);
           setChildren([]);
         }
-      } else {
       }
     };
 
@@ -130,33 +129,6 @@ const TeachersPage = () => {
         toast.error("Please log in to send invitations");
         setSendingInvite(false);
         return;
-      }
-
-      // Debug: Log token info and decoded user (without exposing full token)
-      try {
-        let token = savedUser;
-        try {
-          token = JSON.parse(savedUser);
-        } catch {
-          token = savedUser;
-        }
-        
-        // Decode JWT to see what's in it
-        let decodedUser = null;
-        if (token && typeof token === 'string') {
-          try {
-            const parts = token.split('.');
-            if (parts.length === 3) {
-              const payload = parts[1];
-              decodedUser = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
-            }
-          } catch (e) {
-            console.error("Error decoding token:", e);
-          }
-        }
-        
-      } catch (e) {
-        console.error("Error checking token:", e);
       }
 
       // Prepare invitation data using teacher's existing data
@@ -269,10 +241,6 @@ const TeachersPage = () => {
                         const isExpanded = expandedTeachers.has(teacher._id);
                         const teacherChildren = getChildrenForTeacher(teacher.name);
                         const hasChildren = teacherChildren.length > 0;
-                        
-                        // Debug logging
-                        if (isAdmin()) {
-                        }
 
                         const rows = [
                           <tr 

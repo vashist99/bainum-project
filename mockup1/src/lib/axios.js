@@ -66,7 +66,6 @@ apiClient.interceptors.request.use(
       } catch (error) {
         console.error('Error parsing token from localStorage:', error);
       }
-    } else {
     }
     return config;
   },

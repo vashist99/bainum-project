@@ -85,7 +85,7 @@ const AddTeacherForm = () => {
       };
 
       // Make API call to create teacher in database
-      const response = await axios.post("/api/teachers", teacherData);
+      await axios.post("/api/teachers", teacherData);
 
       toast.success("Teacher added successfully!");
 

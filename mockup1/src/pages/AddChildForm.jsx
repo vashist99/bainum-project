@@ -81,7 +81,7 @@ const AddChildForm = () => {
       };
 
       // Make API call to create child in database
-      const response = await axios.post("/api/children", childData);
+      await axios.post("/api/children", childData);
 
       toast.success("Child added successfully!");
 
