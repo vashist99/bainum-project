@@ -8,7 +8,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 const TeachersPage = () => {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [teachers, setTeachers] = useState([]);
   const [children, setChildren] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,11 +43,15 @@ const TeachersPage = () => {
       if (isAdmin()) {
         try {
           const response = await axios.get("/api/children");
-          setChildren(response.data.children || []);
+          const childrenList = response.data.children || [];
+          setChildren(childrenList);
+          console.log("Loaded children for TeachersPage:", childrenList.length, childrenList);
         } catch (error) {
           console.error("Error fetching children:", error);
           setChildren([]);
         }
+      } else {
+        console.log("Not admin, skipping children fetch");
       }
     };
 
@@ -79,7 +83,14 @@ const TeachersPage = () => {
 
   const getChildrenForTeacher = (teacherName) => {
     if (!isAdmin()) return [];
-    return children.filter(child => child.leadTeacher === teacherName);
+    const filtered = children.filter(child => {
+      // Match by exact name or trim whitespace
+      const childLeadTeacher = child.leadTeacher?.trim() || '';
+      const teacherNameTrimmed = teacherName?.trim() || '';
+      return childLeadTeacher === teacherNameTrimmed;
+    });
+    console.log(`Children for teacher "${teacherName}":`, filtered.length, filtered);
+    return filtered;
   };
 
   const openInviteModal = (teacher) => {
@@ -106,16 +117,58 @@ const TeachersPage = () => {
       return;
     }
 
+    // Verify user is admin
+    if (!isAdmin()) {
+      toast.error("Only administrators can send teacher invitations");
+      return;
+    }
+
     setSendingInvite(true);
 
     try {
-      // Get token from localStorage
+      // Verify user is logged in
       const savedUser = localStorage.getItem('user');
-      const token = savedUser ? JSON.parse(savedUser) : null;
-
-      if (!token) {
+      if (!savedUser) {
         toast.error("Please log in to send invitations");
+        setSendingInvite(false);
         return;
+      }
+
+      // Debug: Log token info and decoded user (without exposing full token)
+      try {
+        let token = savedUser;
+        try {
+          token = JSON.parse(savedUser);
+        } catch {
+          token = savedUser;
+        }
+        
+        // Decode JWT to see what's in it
+        let decodedUser = null;
+        if (token && typeof token === 'string') {
+          try {
+            const parts = token.split('.');
+            if (parts.length === 3) {
+              const payload = parts[1];
+              decodedUser = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+            }
+          } catch (e) {
+            console.error("Error decoding token:", e);
+          }
+        }
+        
+        console.log("Token check:", {
+          hasToken: !!token,
+          tokenType: typeof token,
+          tokenLength: token?.length,
+          tokenPreview: token ? `${token.substring(0, 20)}...` : 'none'
+        });
+        
+        console.log("Decoded user from token:", decodedUser);
+        console.log("Current user from AuthContext:", user);
+        console.log("Is admin check:", isAdmin());
+      } catch (e) {
+        console.error("Error checking token:", e);
       }
 
       // Prepare invitation data using teacher's existing data
@@ -128,12 +181,15 @@ const TeachersPage = () => {
         center: selectedTeacherForInvite.center || "",
       };
 
-      // Send invitation
-      const response = await axios.post("/api/teacher-invitations/send", invitationData, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+      console.log("Sending invitation with data:", {
+        ...invitationData,
+        dateOfBirth: invitationData.dateOfBirth
       });
+
+      // Send invitation - axios interceptor will automatically add the Authorization header
+      const response = await axios.post("/api/teacher-invitations/send", invitationData);
+      
+      console.log("Invitation response:", response.data);
 
       // Check if email was sent successfully or if manual sharing is needed
       if (response.data.warning) {
@@ -159,10 +215,22 @@ const TeachersPage = () => {
       setInviteEmail("");
       setSelectedTeacherForInvite(null);
     } catch (error) {
-      const errorMessage =
-        error.response?.data?.message || "Failed to send invitation. Please try again.";
-      toast.error(errorMessage);
       console.error("Error sending invitation:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+      console.error("Error headers:", error.response?.headers);
+      
+      let errorMessage = "Failed to send invitation. Please try again.";
+      
+      if (error.response?.status === 403) {
+        errorMessage = "Access denied. Only admins can send teacher invitations. Please check your login status.";
+      } else if (error.response?.status === 401) {
+        errorMessage = "Authentication failed. Please log out and log back in.";
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setSendingInvite(false);
     }
@@ -221,6 +289,11 @@ const TeachersPage = () => {
                         const isExpanded = expandedTeachers.has(teacher._id);
                         const teacherChildren = getChildrenForTeacher(teacher.name);
                         const hasChildren = teacherChildren.length > 0;
+                        
+                        // Debug logging
+                        if (isAdmin()) {
+                          console.log(`Teacher: ${teacher.name}, Children count: ${teacherChildren.length}, Has children: ${hasChildren}`);
+                        }
 
                         const rows = [
                           <tr 
@@ -228,29 +301,26 @@ const TeachersPage = () => {
                             onClick={(e) => {
                               // Don't expand if clicking on action buttons
                               if (!e.target.closest('button, .btn')) {
-                                if (isAdmin() && hasChildren) {
+                                if (isAdmin()) {
                                   toggleTeacherExpansion(teacher._id);
                                 }
                               }
                             }}
-                            className={isAdmin() && hasChildren ? "cursor-pointer hover:bg-base-200" : ""}
+                            className={isAdmin() ? "cursor-pointer hover:bg-base-200" : ""}
                           >
                             {isAdmin() && (
                               <td onClick={(e) => e.stopPropagation()}>
-                                {hasChildren ? (
-                                  <button
-                                    onClick={() => toggleTeacherExpansion(teacher._id)}
-                                    className="btn btn-ghost btn-xs btn-circle"
-                                  >
-                                    {isExpanded ? (
-                                      <ChevronDown className="w-4 h-4" />
-                                    ) : (
-                                      <ChevronRight className="w-4 h-4" />
-                                    )}
-                                  </button>
-                                ) : (
-                                  <span className="w-6"></span>
-                                )}
+                                <button
+                                  onClick={() => toggleTeacherExpansion(teacher._id)}
+                                  className="btn btn-ghost btn-xs btn-circle"
+                                  title={hasChildren ? `View ${teacherChildren.length} children` : "View children (none assigned)"}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-4 h-4" />
+                                  ) : (
+                                    <ChevronRight className="w-4 h-4" />
+                                  )}
+                                </button>
                               </td>
                             )}
                             <td>{index + 1}</td>
@@ -285,12 +355,17 @@ const TeachersPage = () => {
                             </td>
                             <td onClick={(e) => e.stopPropagation()}>
                               <div className="flex gap-2">
-                                <button className="btn btn-ghost btn-xs">
+                                <button 
+                                  onClick={() => navigate(`/teachers/edit/${teacher._id}`)}
+                                  className="btn btn-ghost btn-xs"
+                                  title="Edit teacher"
+                                >
                                   <Edit className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(teacher._id)}
                                   className="btn btn-ghost btn-xs text-error"
+                                  title="Delete teacher"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -299,8 +374,8 @@ const TeachersPage = () => {
                           </tr>
                         ];
 
-                        // Add children row if expanded
-                        if (isAdmin() && isExpanded && hasChildren) {
+                        // Add children row if expanded (always show for admins, even if no children)
+                        if (isAdmin() && isExpanded) {
                           rows.push(
                             <tr key={`${teacher._id}-children`}>
                               <td colSpan={isAdmin() ? 8 : 7} className="bg-base-200 p-0">
@@ -308,48 +383,51 @@ const TeachersPage = () => {
                                   <h4 className="font-semibold mb-3 text-sm text-base-content/70">
                                     Children Under Supervision ({teacherChildren.length})
                                   </h4>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {teacherChildren.map((child) => (
-                                      <div
-                                        key={child._id}
-                                        onClick={() => navigate(`/data/child/${child._id}`)}
-                                        className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-base-300 hover:border-primary"
-                                      >
-                                        <div className="card-body p-4">
-                                          <div className="flex items-center gap-2">
-                                            <User className="w-4 h-4 text-primary" />
-                                            <h5 className="font-semibold text-sm">{child.name}</h5>
-                                          </div>
-                                          <div className="text-xs text-base-content/60 mt-2">
-                                            {child.dateOfBirth && (
-                                              <p>Age: {(() => {
-                                                const birthDate = new Date(child.dateOfBirth);
-                                                const today = new Date();
-                                                const yearsDiff = today.getFullYear() - birthDate.getFullYear();
-                                                const monthsDiff = today.getMonth() - birthDate.getMonth();
-                                                const totalMonths = yearsDiff * 12 + monthsDiff;
-                                                const finalMonths = today.getDate() < birthDate.getDate() ? Math.max(0, totalMonths - 1) : totalMonths;
-                                                return `${finalMonths} months`;
-                                              })()}</p>
-                                            )}
-                                            {child.gender && <p>Gender: {child.gender}</p>}
-                                            {child.diagnosis && (
-                                              <p>
-                                                Diagnosis: <span className={child.diagnosis === "Yes" ? "text-warning" : "text-success"}>{child.diagnosis}</span>
-                                              </p>
-                                            )}
-                                          </div>
-                                          <div className="card-actions justify-end mt-2">
-                                            <button className="btn btn-xs btn-primary">
-                                              View Details
-                                            </button>
+                                  {teacherChildren.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                      {teacherChildren.map((child) => (
+                                        <div
+                                          key={child._id}
+                                          onClick={() => navigate(`/data/child/${child._id}`)}
+                                          className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-base-300 hover:border-primary"
+                                        >
+                                          <div className="card-body p-4">
+                                            <div className="flex items-center gap-2">
+                                              <User className="w-4 h-4 text-primary" />
+                                              <h5 className="font-semibold text-sm">{child.name}</h5>
+                                            </div>
+                                            <div className="text-xs text-base-content/60 mt-2">
+                                              {child.dateOfBirth && (
+                                                <p>Age: {(() => {
+                                                  const birthDate = new Date(child.dateOfBirth);
+                                                  const today = new Date();
+                                                  const yearsDiff = today.getFullYear() - birthDate.getFullYear();
+                                                  const monthsDiff = today.getMonth() - birthDate.getMonth();
+                                                  const totalMonths = yearsDiff * 12 + monthsDiff;
+                                                  const finalMonths = today.getDate() < birthDate.getDate() ? Math.max(0, totalMonths - 1) : totalMonths;
+                                                  return `${finalMonths} months`;
+                                                })()}</p>
+                                              )}
+                                              {child.gender && <p>Gender: {child.gender}</p>}
+                                              {child.diagnosis && (
+                                                <p>
+                                                  Diagnosis: <span className={child.diagnosis === "Yes" ? "text-warning" : "text-success"}>{child.diagnosis}</span>
+                                                </p>
+                                              )}
+                                            </div>
+                                            <div className="card-actions justify-end mt-2">
+                                              <button className="btn btn-xs btn-primary">
+                                                View Details
+                                              </button>
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  {teacherChildren.length === 0 && (
-                                    <p className="text-sm text-base-content/60">No children assigned to this teacher.</p>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="alert alert-info">
+                                      <p className="text-sm">No children assigned to this teacher.</p>
+                                    </div>
                                   )}
                                 </div>
                               </td>

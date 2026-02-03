@@ -10,12 +10,12 @@ import ReactSpeedometer, { CustomSegmentLabelPosition } from "react-d3-speedomet
 const ChildDataPage = () => {
   const { childId } = useParams();
   const navigate = useNavigate();
-  const { user, isParent, isAdmin } = useAuth();
+  const { user, isParent, isAdmin, isTeacher } = useAuth();
 
   // Prevent parents from navigating away using browser back button
   useEffect(() => {
     if (isParent() && user?.childId) {
-      const handlePopState = (e) => {
+      const handlePopState = () => {
         // Prevent navigation away from child's page
         window.history.pushState(null, '', `/data/child/${user.childId}`);
         toast.info("You can only view your child's data page");
@@ -45,6 +45,9 @@ const ChildDataPage = () => {
   const [showTranscriptModal, setShowTranscriptModal] = useState(false);
   const [pendingTranscript, setPendingTranscript] = useState(null);
   const [pendingAssessment, setPendingAssessment] = useState(null);
+  const [teachers, setTeachers] = useState([]);
+  const [allChildren, setAllChildren] = useState([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
 
   useEffect(() => {
     const fetchChild = async () => {
@@ -149,6 +152,32 @@ const ChildDataPage = () => {
 
     fetchAllAssessments();
   }, [childId]);
+
+  // Load teachers and all children (for admin/teacher views)
+  useEffect(() => {
+    const fetchTeachersAndChildren = async () => {
+      if (isAdmin() || isTeacher()) {
+        try {
+          setLoadingTeachers(true);
+          // Fetch teachers
+          const teachersResponse = await axios.get("/api/teachers");
+          setTeachers(teachersResponse.data.teachers || []);
+          
+          // Fetch all children
+          const childrenResponse = await axios.get("/api/children");
+          setAllChildren(childrenResponse.data.children || []);
+        } catch (error) {
+          console.error("Error fetching teachers/children:", error);
+          setTeachers([]);
+          setAllChildren([]);
+        } finally {
+          setLoadingTeachers(false);
+        }
+      }
+    };
+
+    fetchTeachersAndChildren();
+  }, [isAdmin, isTeacher]);
 
   const handleAddNote = async () => {
     if (!newNote.trim()) {
@@ -658,11 +687,109 @@ const ChildDataPage = () => {
                   <Users className="w-8 h-8" />
                 </div>
                 <div className="stat-title">Lead Teacher</div>
-                <div className="stat-value text-2xl">{child.leadTeacher}</div>
+                {isAdmin() && teachers.length > 0 ? (
+                  <div className="stat-value text-lg">
+                    <select
+                      className="select select-bordered select-primary w-full max-w-xs"
+                      value={child.leadTeacher || ""}
+                      onChange={async (e) => {
+                        const newLeadTeacher = e.target.value;
+                        if (newLeadTeacher && newLeadTeacher !== child.leadTeacher) {
+                          try {
+                            await axios.put(`/api/children/${childId}`, {
+                              ...child,
+                              leadTeacher: newLeadTeacher
+                            });
+                            toast.success("Lead teacher updated successfully");
+                            // Reload child data
+                            const response = await axios.get(`/api/children/${childId}`);
+                            setChild(response.data.child);
+                          } catch (error) {
+                            toast.error("Failed to update lead teacher");
+                            console.error("Error updating lead teacher:", error);
+                          }
+                        }
+                      }}
+                    >
+                      <option value="">Select teacher</option>
+                      {teachers.map((teacher) => (
+                        <option key={teacher._id} value={teacher.name}>
+                          {teacher.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="stat-value text-2xl">{child.leadTeacher}</div>
+                )}
               </div>
             </div>
           </div>
         </div>
+
+        {/* Other Children Under Same Teacher - Admin/Teacher View */}
+        {(isAdmin() || isTeacher()) && child?.leadTeacher && (
+          <div className="card bg-base-100 shadow-xl mb-6">
+            <div className="card-body">
+              <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
+                <Users className="w-6 h-6 text-primary" />
+                Other Children Under {child.leadTeacher}
+              </h2>
+              <div className="divider"></div>
+              {loadingTeachers ? (
+                <div className="flex justify-center items-center h-32">
+                  <span className="loading loading-spinner loading-lg"></span>
+                </div>
+              ) : (
+                <>
+                  {allChildren.filter(c => c._id !== childId && c.leadTeacher === child.leadTeacher).length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {allChildren
+                        .filter(c => c._id !== childId && c.leadTeacher === child.leadTeacher)
+                        .map((otherChild) => (
+                          <div
+                            key={otherChild._id}
+                            onClick={() => navigate(`/data/child/${otherChild._id}`)}
+                            className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-base-300 hover:border-primary"
+                          >
+                            <div className="card-body p-4">
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-primary" />
+                                <h5 className="font-semibold text-sm">{otherChild.name}</h5>
+                              </div>
+                              <div className="text-xs text-base-content/60 mt-2">
+                                {otherChild.dateOfBirth && (
+                                  <p>Age: {(() => {
+                                    const birthDate = new Date(otherChild.dateOfBirth);
+                                    const today = new Date();
+                                    const yearsDiff = today.getFullYear() - birthDate.getFullYear();
+                                    const monthsDiff = today.getMonth() - birthDate.getMonth();
+                                    const totalMonths = yearsDiff * 12 + monthsDiff;
+                                    const finalMonths = today.getDate() < birthDate.getDate() ? Math.max(0, totalMonths - 1) : totalMonths;
+                                    return `${finalMonths} months`;
+                                  })()}</p>
+                                )}
+                                {otherChild.gender && <p>Gender: {otherChild.gender}</p>}
+                              </div>
+                              <div className="card-actions justify-end mt-2">
+                                <button className="btn btn-xs btn-primary">
+                                  View Details
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="alert alert-info">
+                      <span>No other children assigned to {child.leadTeacher}</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Language Development Section */}
         <div className="card bg-base-100 shadow-xl mb-6">

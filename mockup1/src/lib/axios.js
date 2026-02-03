@@ -59,7 +59,7 @@ apiClient.interceptors.request.use(
         let token = savedUser;
         try {
           token = JSON.parse(savedUser);
-        } catch (e) {
+        } catch {
           // If parsing fails, it's already a string
           token = savedUser;
         }
@@ -67,14 +67,52 @@ apiClient.interceptors.request.use(
         // Add Authorization header if token exists
         if (token && typeof token === 'string') {
           config.headers.Authorization = `Bearer ${token}`;
+          
+          // Debug logging for teacher invitations endpoint
+          if (config.url && config.url.includes('teacher-invitations')) {
+            console.log('Teacher invitation request:', {
+              url: config.url,
+              hasAuthHeader: !!config.headers.Authorization,
+              authHeaderPreview: config.headers.Authorization ? `${config.headers.Authorization.substring(0, 30)}...` : 'none',
+              tokenLength: token.length,
+              tokenPreview: token.substring(0, 20) + '...'
+            });
+          }
+        } else {
+          console.warn('Token is not a string:', typeof token, token);
         }
       } catch (error) {
         console.error('Error parsing token from localStorage:', error);
+      }
+    } else {
+      // Debug: log if no token found for teacher invitations
+      if (config.url && config.url.includes('teacher-invitations')) {
+        console.warn('No token found in localStorage for teacher invitation request');
       }
     }
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor to log errors
+apiClient.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // Log 403 errors for teacher invitations
+    if (error.config?.url?.includes('teacher-invitations') && error.response?.status === 403) {
+      console.error('403 Forbidden on teacher invitation:', {
+        url: error.config.url,
+        status: error.response.status,
+        message: error.response.data?.message,
+        headers: error.response.headers,
+        requestHeaders: error.config.headers
+      });
+    }
     return Promise.reject(error);
   }
 );

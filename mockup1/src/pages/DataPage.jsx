@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
-import { Plus, Users, ChevronRight, UserPlus, Mail } from "lucide-react";
+import { Plus, Users, ChevronRight, UserPlus, Mail, Edit, Trash2 } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
@@ -120,7 +120,7 @@ const DataPage = () => {
         
         // Show the link in a more visible way
         setTimeout(() => {
-          const shareLink = prompt(
+          prompt(
             "Email not configured. Please copy and share this invitation link with the parent:\n\n" + link,
             link
           );
@@ -151,6 +151,21 @@ const DataPage = () => {
   const openInviteModal = (child) => {
     setSelectedChildForInvite(child);
     setShowInviteModal(true);
+  };
+
+  const handleDeleteChild = async (childId) => {
+    if (window.confirm("Are you sure you want to delete this child? This action cannot be undone.")) {
+      try {
+        await axios.delete(`/api/children/${childId}`);
+        setChildren(children.filter((child) => (child._id || child.id) !== childId));
+        setFilteredChildren(filteredChildren.filter((child) => (child._id || child.id) !== childId));
+        toast.success("Child deleted successfully");
+      } catch (error) {
+        console.error("Error deleting child:", error);
+        const errorMessage = error.response?.data?.message || "Failed to delete child";
+        toast.error(errorMessage);
+      }
+    }
   };
 
   return (
@@ -295,9 +310,24 @@ const DataPage = () => {
                             <button
                                 onClick={() => navigate(`/data/child/${child._id || child.id}`)}
                               className="btn btn-ghost btn-xs"
+                                title="View details"
                             >
                               View Details
                             </button>
+                              <button
+                                onClick={() => navigate(`/children/edit/${child._id || child.id}`)}
+                                className="btn btn-ghost btn-xs"
+                                title="Edit child"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteChild(child._id || child.id)}
+                                className="btn btn-ghost btn-xs text-error"
+                                title="Delete child"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                               <button
                                 onClick={() => openInviteModal(child)}
                                 className="btn btn-primary btn-xs gap-1"

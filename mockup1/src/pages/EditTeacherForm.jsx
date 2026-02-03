@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import Navbar from "../components/Navbar";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
 import axios from "../lib/axios";
 
-const AddTeacherForm = () => {
+const EditTeacherForm = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
   const [loading, setLoading] = useState(false);
+  const [loadingTeacher, setLoadingTeacher] = useState(true);
   const [centers, setCenters] = useState([]);
   const [loadingCenters, setLoadingCenters] = useState(true);
   const [formData, setFormData] = useState({
@@ -28,7 +30,6 @@ const AddTeacherForm = () => {
         setCenters(response.data.centers || []);
       } catch (error) {
         console.error("Error fetching centers:", error);
-        toast.error("Failed to load centers");
         setCenters([]);
       } finally {
         setLoadingCenters(false);
@@ -36,6 +37,43 @@ const AddTeacherForm = () => {
     };
     fetchCenters();
   }, []);
+
+  // Load teacher data
+  useEffect(() => {
+    const fetchTeacher = async () => {
+      try {
+        setLoadingTeacher(true);
+        const response = await axios.get(`/api/teachers/${id}`);
+        const teacher = response.data.teacher;
+        
+        if (teacher) {
+          // Split name into first and last name
+          const nameParts = teacher.name.split(' ');
+          const firstName = nameParts[0] || '';
+          const lastName = nameParts.slice(1).join(' ') || '';
+          
+          setFormData({
+            firstName,
+            lastName,
+            email: teacher.email || "",
+            education: teacher.education || "",
+            dateOfBirth: teacher.dateOfBirth ? new Date(teacher.dateOfBirth).toISOString().split('T')[0] : "",
+            center: teacher.center || "",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching teacher:", error);
+        toast.error("Failed to load teacher data");
+        navigate("/teachers");
+      } finally {
+        setLoadingTeacher(false);
+      }
+    };
+
+    if (id) {
+      fetchTeacher();
+    }
+  }, [id, navigate]);
 
   const handleInputChange = (e) => {
     setFormData({
@@ -84,23 +122,35 @@ const AddTeacherForm = () => {
         dateOfBirth: formData.dateOfBirth,
       };
 
-      // Make API call to create teacher in database
-      const response = await axios.post("/api/teachers", teacherData);
+      // Make API call to update teacher
+      await axios.put(`/api/teachers/${id}`, teacherData);
 
-      toast.success("Teacher added successfully!");
-      console.log("Teacher created:", response.data);
+      toast.success("Teacher updated successfully!");
 
       // Navigate to teachers page
       navigate("/teachers");
     } catch (error) {
       const errorMessage =
-        error.response?.data?.message || "Failed to add teacher. Please try again.";
+        error.response?.data?.message || "Failed to update teacher. Please try again.";
       toast.error(errorMessage);
-      console.error("Error creating teacher:", error);
+      console.error("Error updating teacher:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  if (loadingTeacher) {
+    return (
+      <div className="min-h-screen bg-base-200">
+        <Navbar />
+        <div className="container mx-auto p-6 max-w-2xl">
+          <div className="flex justify-center items-center h-64">
+            <span className="loading loading-spinner loading-lg"></span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -115,7 +165,7 @@ const AddTeacherForm = () => {
             <ArrowLeft className="w-6 h-6" />
           </button>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Add Teacher
+            Edit Teacher
           </h1>
         </div>
 
@@ -236,10 +286,10 @@ const AddTeacherForm = () => {
                   {loading ? (
                     <>
                       <span className="loading loading-spinner"></span>
-                      Adding Teacher...
+                      Updating Teacher...
                     </>
                   ) : (
-                    "Add Teacher"
+                    "Update Teacher"
                   )}
                 </button>
               </div>
@@ -251,5 +301,4 @@ const AddTeacherForm = () => {
   );
 };
 
-export default AddTeacherForm;
-
+export default EditTeacherForm;

@@ -1,4 +1,4 @@
-import { Users, BarChart3, LogOut } from "lucide-react";
+import { Users, BarChart3, LogOut, Building2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 const Navbar = () => {
@@ -34,12 +34,20 @@ const Navbar = () => {
             className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52"
           >
             {isAdmin() && (
+              <>
+                <li>
+                  <a href="/centers" className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4" />
+                    Centers
+                  </a>
+                </li>
               <li>
                 <a href="/teachers" className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   Teachers
                 </a>
               </li>
+              </>
             )}
             {!isParent() && (
             <li>
@@ -65,12 +73,20 @@ const Navbar = () => {
       <div className="navbar-center hidden lg:flex">
         <ul className="menu menu-horizontal px-1 gap-2">
           {isAdmin() && (
+            <>
+              <li>
+                <a href="/centers" className="btn btn-ghost flex items-center gap-2">
+                  <Building2 className="w-5 h-5" />
+                  Centers
+                </a>
+              </li>
             <li>
               <a href="/teachers" className="btn btn-ghost flex items-center gap-2">
                 <Users className="w-5 h-5" />
                 Teachers
               </a>
             </li>
+            </>
           )}
           {!isParent() && (
           <li>
@@ -101,13 +117,6 @@ const Navbar = () => {
               <span className="text-xs text-base-content/60 capitalize">{user?.role || 'No Role'}</span>
             </li>
             <div className="divider my-1"></div>
-            <li>
-              <a className="justify-between">
-                Profile
-                <span className="badge">New</span>
-              </a>
-            </li>
-            <li><a>Settings</a></li>
             <li>
               <a onClick={handleLogout} className="flex items-center gap-2 text-error">
                 <LogOut className="w-4 h-4" />

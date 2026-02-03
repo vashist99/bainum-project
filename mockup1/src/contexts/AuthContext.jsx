@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -45,7 +46,7 @@ export const AuthProvider = ({ children }) => {
         let token = savedUser;
         try {
           token = JSON.parse(savedUser);
-        } catch (e) {
+        } catch {
           // If parsing fails, it's already a string
           token = savedUser;
         }
