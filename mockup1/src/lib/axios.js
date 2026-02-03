@@ -32,14 +32,6 @@ if (isDevelopment) {
   API_BASE_URL = '';
 }
 
-// Log for debugging
-console.log("API Configuration:", {
-  isDevelopment,
-  envApiUrl: envApiUrl || '(not set)',
-  API_BASE_URL: API_BASE_URL || '(using relative URLs)',
-  hostname: window.location.hostname,
-  mode: import.meta.env.MODE
-});
 
 // Create axios instance with base URL
 const apiClient = axios.create({
@@ -68,16 +60,6 @@ apiClient.interceptors.request.use(
         if (token && typeof token === 'string') {
           config.headers.Authorization = `Bearer ${token}`;
           
-          // Debug logging for teacher invitations endpoint
-          if (config.url && config.url.includes('teacher-invitations')) {
-            console.log('Teacher invitation request:', {
-              url: config.url,
-              hasAuthHeader: !!config.headers.Authorization,
-              authHeaderPreview: config.headers.Authorization ? `${config.headers.Authorization.substring(0, 30)}...` : 'none',
-              tokenLength: token.length,
-              tokenPreview: token.substring(0, 20) + '...'
-            });
-          }
         } else {
           console.warn('Token is not a string:', typeof token, token);
         }
@@ -85,10 +67,6 @@ apiClient.interceptors.request.use(
         console.error('Error parsing token from localStorage:', error);
       }
     } else {
-      // Debug: log if no token found for teacher invitations
-      if (config.url && config.url.includes('teacher-invitations')) {
-        console.warn('No token found in localStorage for teacher invitation request');
-      }
     }
     return config;
   },

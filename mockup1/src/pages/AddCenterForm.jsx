@@ -53,7 +53,6 @@ const AddCenterForm = () => {
       const response = await axios.post("/api/centers", formData);
 
       toast.success("Center added successfully!");
-      console.log("Center created:", response.data);
 
       // Navigate to centers page
       navigate("/centers");

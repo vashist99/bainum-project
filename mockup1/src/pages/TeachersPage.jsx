@@ -45,13 +45,11 @@ const TeachersPage = () => {
           const response = await axios.get("/api/children");
           const childrenList = response.data.children || [];
           setChildren(childrenList);
-          console.log("Loaded children for TeachersPage:", childrenList.length, childrenList);
         } catch (error) {
           console.error("Error fetching children:", error);
           setChildren([]);
         }
       } else {
-        console.log("Not admin, skipping children fetch");
       }
     };
 
@@ -157,16 +155,6 @@ const TeachersPage = () => {
           }
         }
         
-        console.log("Token check:", {
-          hasToken: !!token,
-          tokenType: typeof token,
-          tokenLength: token?.length,
-          tokenPreview: token ? `${token.substring(0, 20)}...` : 'none'
-        });
-        
-        console.log("Decoded user from token:", decodedUser);
-        console.log("Current user from AuthContext:", user);
-        console.log("Is admin check:", isAdmin());
       } catch (e) {
         console.error("Error checking token:", e);
       }
@@ -181,15 +169,8 @@ const TeachersPage = () => {
         center: selectedTeacherForInvite.center || "",
       };
 
-      console.log("Sending invitation with data:", {
-        ...invitationData,
-        dateOfBirth: invitationData.dateOfBirth
-      });
-
       // Send invitation - axios interceptor will automatically add the Authorization header
       const response = await axios.post("/api/teacher-invitations/send", invitationData);
-      
-      console.log("Invitation response:", response.data);
 
       // Check if email was sent successfully or if manual sharing is needed
       if (response.data.warning) {
@@ -203,7 +184,6 @@ const TeachersPage = () => {
             toast.success("Invitation link copied to clipboard!");
           }).catch(() => {
             alert(`Invitation link:\n${link}`);
-            console.log("Invitation link:", link);
           });
         }
       } else {
@@ -292,7 +272,6 @@ const TeachersPage = () => {
                         
                         // Debug logging
                         if (isAdmin()) {
-                          console.log(`Teacher: ${teacher.name}, Children count: ${teacherChildren.length}, Has children: ${hasChildren}`);
                         }
 
                         const rows = [

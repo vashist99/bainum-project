@@ -258,7 +258,6 @@ const ChildDataPage = () => {
         },
       });
 
-      console.log("Assessment result:", response.data);
 
       // Store transcript and assessment data for review
       if (response.data.transcript && response.data.assessment) {
@@ -285,14 +284,10 @@ const ChildDataPage = () => {
 
   const handleAcceptTranscript = async () => {
     try {
-      console.log("Accepting transcript, pendingAssessment:", pendingAssessment);
-      console.log("KeywordCounts being sent:", pendingAssessment?.keywordCounts);
       
       // Save the assessment to the server
       const response = await axios.post('/api/assessments/accept', pendingAssessment);
       
-      console.log("Assessment saved, response:", response.data);
-      console.log("Saved assessment keywordCounts:", response.data.assessment?.keywordCounts);
       
       toast.success("Assessment saved successfully!");
       
@@ -305,8 +300,6 @@ const ChildDataPage = () => {
       
       // Reload all assessments for aggregation
       const allAssessmentsResponse = await axios.get(`/api/assessments/child/${childId}`);
-      console.log("All assessments loaded:", allAssessmentsResponse.data.assessments?.length || 0);
-      console.log("First assessment keywordCounts:", allAssessmentsResponse.data.assessments?.[0]?.keywordCounts);
       setAllAssessments(allAssessmentsResponse.data.assessments || []);
       
       // Close transcript modal and reset

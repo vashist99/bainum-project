@@ -58,7 +58,6 @@ const DataPage = () => {
   // Separate effect to handle teacher auto-selection after data loads
   useEffect(() => {
     if (!loading && isTeacher() && user?.name && !selectedTeacher) {
-      console.log("Auto-selecting teacher:", user.name);
       setSelectedTeacher(user.name);
     }
   }, [loading, isTeacher, user, selectedTeacher]);

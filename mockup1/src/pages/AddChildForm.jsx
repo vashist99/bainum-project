@@ -84,7 +84,6 @@ const AddChildForm = () => {
       const response = await axios.post("/api/children", childData);
 
       toast.success("Child added successfully!");
-      console.log("Child created:", response.data);
 
       // Navigate to data page
       navigate("/data");

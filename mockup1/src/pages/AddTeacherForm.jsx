@@ -88,7 +88,6 @@ const AddTeacherForm = () => {
       const response = await axios.post("/api/teachers", teacherData);
 
       toast.success("Teacher added successfully!");
-      console.log("Teacher created:", response.data);
 
       // Navigate to teachers page
       navigate("/teachers");
