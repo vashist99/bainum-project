@@ -7,6 +7,10 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:  # Allow manual triggering when GitHub is stable
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
