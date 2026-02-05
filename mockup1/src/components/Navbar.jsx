@@ -53,7 +53,7 @@ const Navbar = () => {
             <li>
               <a href="/data" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
-                Data
+                Child Data
               </a>
             </li>
             )}
@@ -92,7 +92,7 @@ const Navbar = () => {
           <li>
             <a href="/data" className="btn btn-ghost flex items-center gap-2">
               <BarChart3 className="w-5 h-5" />
-              Data
+              Child Data
             </a>
           </li>
           )}
