@@ -113,16 +113,20 @@ const DataPage = () => {
           response.data.invitationLink ||
           `${window.location.origin}/parent/register?token=${response.data.invitation?.token}`;
         
-        toast.success("Invitation created! Email not configured.", {
-          duration: 5000,
+        const errorMsg = response.data.emailError ? `\n\nError: ${response.data.emailError}` : '';
+        toast.error(`Invitation created but email failed to send.${errorMsg}`, {
+          duration: 15000,
         });
         
         // Show the link in a more visible way
         setTimeout(() => {
-          prompt(
-            "Email not configured. Please copy and share this invitation link with the parent:\n\n" + link,
-            link
-          );
+          const message = `Email not configured. Please copy and share this invitation link with the parent:${errorMsg}\n\n${link}`;
+          navigator.clipboard.writeText(link).then(() => {
+            toast.success("Invitation link copied to clipboard!");
+            alert(message);
+          }).catch(() => {
+            prompt(message, link);
+          });
         }, 500);
       } else {
         toast.success("Invitation sent successfully!");

@@ -146,16 +146,17 @@ const TeachersPage = () => {
 
       // Check if email was sent successfully or if manual sharing is needed
       if (response.data.warning) {
-        // Email failed, show invitation link
-        toast.success("Invitation created! Email failed to send. Please share the link manually.", {
-          duration: 10000
+        // Email failed, show invitation link with error details
+        const errorMsg = response.data.emailError ? `\n\nError: ${response.data.emailError}` : '';
+        toast.error(`Invitation created but email failed to send.${errorMsg}`, {
+          duration: 15000
         });
         if (response.data.invitation?.invitationLink) {
           const link = response.data.invitation.invitationLink;
           navigator.clipboard.writeText(link).then(() => {
             toast.success("Invitation link copied to clipboard!");
           }).catch(() => {
-            alert(`Invitation link:\n${link}`);
+            alert(`Invitation link:\n${link}${errorMsg}`);
           });
         }
       } else {
