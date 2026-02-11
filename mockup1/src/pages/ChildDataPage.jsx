@@ -6,7 +6,8 @@ import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 import ReactSpeedometer, { CustomSegmentLabelPosition } from "react-d3-speedometer";
-import { highlightRAGSegments, RAGColorLegend } from "../utils/ragHighlighter.jsx";
+import { highlightRAGSegments } from "../utils/ragHighlightSegments.js";
+import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
 
 // Rotating messages shown during audio processing
 const PROCESSING_MESSAGES = [
