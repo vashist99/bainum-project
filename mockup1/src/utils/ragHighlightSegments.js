@@ -28,11 +28,62 @@ const COLORS = {
 };
 
 const CATEGORY_NAMES = {
-  science: 'Science Talk',
-  social: 'Social Talk',
-  literature: 'Literature Talk',
-  language: 'Language Development'
+  science: 'Science skills',
+  social: 'Social emotional skills',
+  literature: 'Literature skills',
+  language: 'Language development skills'
 };
+
+// Keyword lists for fallback highlighting (matches backend when RAG is disabled)
+const KEYWORDS = {
+  science: ['experiment', 'hypothesis', 'observe', 'predict', 'measure', 'test', 'data', 'result', 'science', 'scientist', 'discover', 'investigate', 'analyze', 'research', 'study', 'evidence', 'theory', 'fact', 'nature', 'weather', 'water', 'plant', 'animal', 'grow', 'change', 'why', 'how', 'because', 'reason', 'cause', 'effect'],
+  social: ['friend', 'share', 'help', 'together', 'feelings', 'happy', 'sad', 'angry', 'excited', 'play', 'game', 'fun', 'laugh', 'smile', 'love', 'care', 'kind', 'family', 'mom', 'dad', 'thank', 'please', 'hello', 'goodbye', 'listen', 'talk', 'say', 'tell', 'ask', 'answer'],
+  literature: ['story', 'character', 'beginning', 'ending', 'book', 'read', 'page', 'picture', 'create', 'make', 'once upon a time', 'prince', 'princess', 'magic', 'adventure', 'imagine', 'pretend'],
+  language: ['word', 'sentence', 'speak', 'listen', 'talk', 'say', 'tell', 'language', 'voice', 'describe', 'explain', 'mean', 'understand', 'learn', 'teach', 'question', 'ask', 'answer', 'letter', 'read', 'write', 'spell', 'vocabulary']
+};
+
+/**
+ * Extract keyword-based segments for fallback when RAG segments are missing (e.g. old assessments, production without RAG)
+ * @param {string} transcript - The transcript text
+ * @returns {Array} Array of segment objects { text, category, startIndex, endIndex }
+ */
+export function extractKeywordSegments(transcript) {
+  if (!transcript || typeof transcript !== 'string' || transcript.trim().length === 0) {
+    return [];
+  }
+  const segments = [];
+  Object.keys(KEYWORDS).forEach((category) => {
+    KEYWORDS[category].forEach((keyword) => {
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = keyword.includes(' ')
+        ? new RegExp(`\\b${escaped.replace(/\s+/g, '\\s+')}\\b`, 'gi')
+        : new RegExp(`\\b${escaped}\\b`, 'gi');
+      let match;
+      while ((match = pattern.exec(transcript)) !== null) {
+        segments.push({
+          text: match[0],
+          category,
+          startIndex: match.index,
+          endIndex: match.index + match[0].length
+        });
+      }
+    });
+  });
+  return segments;
+}
+
+/**
+ * Get segments for highlighting - uses RAG segments if available, otherwise keyword-based fallback
+ * @param {string} transcript - The transcript text
+ * @param {Array} ragSegments - RAG segments from backend (may be null/empty)
+ * @returns {Array} Segments to use for highlighting
+ */
+export function getSegmentsForHighlighting(transcript, ragSegments) {
+  if (ragSegments && Array.isArray(ragSegments) && ragSegments.length > 0) {
+    return ragSegments;
+  }
+  return extractKeywordSegments(transcript || '');
+}
 
 /**
  * Highlight transcript segments based on RAG classification

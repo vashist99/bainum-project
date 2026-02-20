@@ -32,19 +32,19 @@ export function RAGColorLegend() {
     <div className="flex flex-wrap gap-3 text-xs mb-3">
       <div className="flex items-center gap-1">
         <span className={`w-3 h-3 rounded ${COLORS.science.bg} ${COLORS.science.border} border`}></span>
-        <span>Science Talk</span>
+        <span>Science skills</span>
       </div>
       <div className="flex items-center gap-1">
         <span className={`w-3 h-3 rounded ${COLORS.social.bg} ${COLORS.social.border} border`}></span>
-        <span>Social Talk</span>
+        <span>Social emotional skills</span>
       </div>
       <div className="flex items-center gap-1">
         <span className={`w-3 h-3 rounded ${COLORS.literature.bg} ${COLORS.literature.border} border`}></span>
-        <span>Literature Talk</span>
+        <span>Literature skills</span>
       </div>
       <div className="flex items-center gap-1">
         <span className={`w-3 h-3 rounded ${COLORS.language.bg} ${COLORS.language.border} border`}></span>
-        <span>Language Development</span>
+        <span>Language development skills</span>
       </div>
     </div>
   );

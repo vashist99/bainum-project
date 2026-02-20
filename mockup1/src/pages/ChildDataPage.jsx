@@ -6,7 +6,7 @@ import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 import ReactSpeedometer, { CustomSegmentLabelPosition } from "react-d3-speedometer";
-import { highlightRAGSegments } from "../utils/ragHighlightSegments.js";
+import { highlightRAGSegments, getSegmentsForHighlighting } from "../utils/ragHighlightSegments.js";
 import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
 
 // Rotating messages shown during audio processing
@@ -14,10 +14,10 @@ const PROCESSING_MESSAGES = [
   { text: "Uploading your audio file...", icon: "📤" },
   { text: "Sending to speech recognition service...", icon: "🎙️" },
   { text: "Transcribing speech to text... (This takes the longest!)", icon: "✍️" },
-  { text: "Analyzing for Science Talk—looking for scientific vocabulary...", icon: "🔬" },
-  { text: "Analyzing for Social Talk—detecting communication patterns...", icon: "💬" },
-  { text: "Analyzing for Literature Talk—finding storytelling elements...", icon: "📚" },
-  { text: "Analyzing Language Development—checking vocabulary growth...", icon: "🧠" },
+  { text: "Analyzing for science skills—looking for scientific vocabulary...", icon: "🔬" },
+  { text: "Analyzing for social emotional skills—detecting communication patterns...", icon: "💬" },
+  { text: "Analyzing for literature skills—finding storytelling elements...", icon: "📚" },
+  { text: "Analyzing language development skills—checking vocabulary growth...", icon: "🧠" },
   { text: "Comparing against reference examples (AI-powered)...", icon: "✨" },
   { text: "Did you know? We track 50+ keywords in each category.", icon: "💡" },
   { text: "Almost there! Preparing your results...", icon: "🎯" },
@@ -830,7 +830,7 @@ const ChildDataPage = () => {
                   value={totalKeywordCounts.scienceTalk || 0}
                   max={speedometerMax}
                   color="text-blue-600"
-                  label="Talk to support Science"
+                  label="Talk to support science skills"
                   description="Scientific vocabulary & concepts"
                   icon={Microscope}
                 />
@@ -838,7 +838,7 @@ const ChildDataPage = () => {
                   value={totalKeywordCounts.socialTalk || 0}
                   max={speedometerMax}
                   color="text-green-600"
-                  label="Talk to support social interactions"
+                  label="Talk to support social emotional skills"
                   description="Communication & interaction"
                   icon={MessageCircle}
                 />
@@ -846,7 +846,7 @@ const ChildDataPage = () => {
                   value={totalKeywordCounts.literatureTalk || 0}
                   max={speedometerMax}
                   color="text-purple-600"
-                  label="Talk to support Literature"
+                  label="Talk to support literature skills"
                   description="Storytelling & narrative skills"
                   icon={BookOpen}
                 />
@@ -854,7 +854,7 @@ const ChildDataPage = () => {
                   value={totalKeywordCounts.languageDevelopment || 0}
                   max={speedometerMax}
                   color="text-orange-600"
-                  label="Talk to support Language development"
+                  label="Talk to support language development skills"
                   description="Overall language growth"
                   icon={Brain}
                 />
@@ -862,12 +862,12 @@ const ChildDataPage = () => {
             ) : (
               // Dot Matrix View
               <div className="space-y-8">
-              {/* Talk to support Science - Year View */}
+              {/* Talk to support science skills - Year View */}
               <div className="border-b border-base-300 pb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <Microscope className="w-6 h-6 text-blue-600" />
                   <div>
-                    <h3 className="font-bold text-lg text-blue-800 dark:text-blue-200">Talk to support Science</h3>
+                    <h3 className="font-bold text-lg text-blue-800 dark:text-blue-200">Talk to support science skills</h3>
                     <p className="text-sm text-blue-700 dark:text-blue-300">Scientific vocabulary & concepts</p>
                   </div>
                 </div>
@@ -927,12 +927,12 @@ const ChildDataPage = () => {
                 </div>
               </div>
 
-              {/* Talk to support social interactions - Year View */}
+              {/* Talk to support social emotional skills - Year View */}
               <div className="border-b border-base-300 pb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <MessageCircle className="w-6 h-6 text-green-600" />
                   <div>
-                    <h3 className="font-bold text-lg text-green-800 dark:text-green-200">Talk to support social interactions</h3>
+                    <h3 className="font-bold text-lg text-green-800 dark:text-green-200">Talk to support social emotional skills</h3>
                     <p className="text-sm text-green-700 dark:text-green-300">Communication & interaction</p>
                   </div>
                 </div>
@@ -991,12 +991,12 @@ const ChildDataPage = () => {
                 </div>
               </div>
 
-              {/* Talk to support Literature - Year View */}
+              {/* Talk to support literature skills - Year View */}
               <div className="border-b border-base-300 pb-6">
                 <div className="flex items-center gap-3 mb-4">
                   <BookOpen className="w-6 h-6 text-purple-600" />
                   <div>
-                    <h3 className="font-bold text-lg text-purple-800 dark:text-purple-200">Talk to support Literature</h3>
+                    <h3 className="font-bold text-lg text-purple-800 dark:text-purple-200">Talk to support literature skills</h3>
                     <p className="text-sm text-purple-700 dark:text-purple-300">Storytelling & narrative skills</p>
                   </div>
                 </div>
@@ -1055,12 +1055,12 @@ const ChildDataPage = () => {
                 </div>
               </div>
 
-              {/* Talk to support Language development - Year View */}
+              {/* Talk to support language development skills - Year View */}
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <Brain className="w-6 h-6 text-orange-600" />
                   <div>
-                    <h3 className="font-bold text-lg text-orange-800 dark:text-orange-200">Talk to support Language development</h3>
+                    <h3 className="font-bold text-lg text-orange-800 dark:text-orange-200">Talk to support language development skills</h3>
                     <p className="text-sm text-orange-700 dark:text-orange-300">Overall language growth</p>
                   </div>
                 </div>
@@ -1193,7 +1193,7 @@ const ChildDataPage = () => {
                   <div className="flex justify-between mb-1">
                     <span className="text-sm font-semibold flex items-center gap-2">
                       <Microscope className="w-4 h-4 text-blue-600" />
-                      Talk to support Science
+                      Talk to support science skills
                     </span>
                     <span className="text-sm text-base-content/60">{totalKeywordCounts?.scienceTalk || 0}/{speedometerMax} words</span>
                   </div>
@@ -1208,7 +1208,7 @@ const ChildDataPage = () => {
                   <div className="flex justify-between mb-1">
                     <span className="text-sm font-semibold flex items-center gap-2">
                       <MessageCircle className="w-4 h-4 text-green-600" />
-                      Talk to support social interactions
+                      Talk to support social emotional skills
                     </span>
                     <span className="text-sm text-base-content/60">{totalKeywordCounts?.socialTalk || 0}/{speedometerMax} words</span>
                   </div>
@@ -1223,7 +1223,7 @@ const ChildDataPage = () => {
                   <div className="flex justify-between mb-1">
                     <span className="text-sm font-semibold flex items-center gap-2">
                       <BookOpen className="w-4 h-4 text-purple-600" />
-                      Talk to support Literature
+                      Talk to support literature skills
                     </span>
                     <span className="text-sm text-base-content/60">{totalKeywordCounts?.literatureTalk || 0}/{speedometerMax} words</span>
                   </div>
@@ -1238,7 +1238,7 @@ const ChildDataPage = () => {
                   <div className="flex justify-between mb-1">
                     <span className="text-sm font-semibold flex items-center gap-2">
                       <Brain className="w-4 h-4 text-orange-600" />
-                      Talk to support Language development
+                      Talk to support language development skills
                     </span>
                     <span className="text-sm text-base-content/60">{totalKeywordCounts?.languageDevelopment || 0}/{speedometerMax} words</span>
                   </div>
@@ -1509,18 +1509,21 @@ const ChildDataPage = () => {
                           </div>
                           
                           <div className="bg-base-100 p-4 rounded-lg border border-base-300 max-h-64 overflow-y-auto">
-                            {assessment.ragSegments && assessment.ragSegments.length > 0 ? (
-                              <>
-                                <RAGColorLegend />
+                            {(() => {
+                              const segments = getSegmentsForHighlighting(assessment.transcript, assessment.ragSegments);
+                              return segments.length > 0 ? (
+                                <>
+                                  <RAGColorLegend />
+                                  <p className="text-sm whitespace-pre-wrap leading-relaxed text-base-content">
+                                    {highlightRAGSegments(assessment.transcript, segments)}
+                                  </p>
+                                </>
+                              ) : (
                                 <p className="text-sm whitespace-pre-wrap leading-relaxed text-base-content">
-                                  {highlightRAGSegments(assessment.transcript, assessment.ragSegments)}
+                                  {assessment.transcript}
                                 </p>
-                              </>
-                            ) : (
-                            <p className="text-sm whitespace-pre-wrap leading-relaxed text-base-content">
-                              {assessment.transcript}
-                            </p>
-                            )}
+                              );
+                            })()}
                           </div>
                           
                           <div className="flex items-center justify-between mt-3 text-xs text-base-content/60">
@@ -1714,18 +1717,21 @@ const ChildDataPage = () => {
                   <span className="label-text font-semibold">Transcribed Text</span>
                 </label>
                 <div className="bg-base-200 p-4 rounded-lg border border-base-300 max-h-96 overflow-y-auto">
-                  {pendingAssessment?.ragSegments && pendingAssessment.ragSegments.length > 0 ? (
-                    <>
-                      <RAGColorLegend />
+                  {(() => {
+                    const segments = getSegmentsForHighlighting(pendingTranscript, pendingAssessment?.ragSegments);
+                    return segments.length > 0 ? (
+                      <>
+                        <RAGColorLegend />
+                        <p className="text-base whitespace-pre-wrap leading-relaxed">
+                          {highlightRAGSegments(pendingTranscript, segments)}
+                        </p>
+                      </>
+                    ) : (
                       <p className="text-base whitespace-pre-wrap leading-relaxed">
-                        {highlightRAGSegments(pendingTranscript, pendingAssessment.ragSegments)}
+                        {pendingTranscript || "No transcript available"}
                       </p>
-                    </>
-                  ) : (
-                  <p className="text-base whitespace-pre-wrap leading-relaxed">
-                    {pendingTranscript || "No transcript available"}
-                  </p>
-                  )}
+                    );
+                  })()}
                 </div>
                 {pendingTranscript && (
                   <label className="label">
@@ -1744,19 +1750,19 @@ const ChildDataPage = () => {
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="stat bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg p-3">
-                      <div className="stat-title text-xs text-blue-800 dark:text-blue-300">Science Talk</div>
+                      <div className="stat-title text-xs text-blue-800 dark:text-blue-300">Science skills</div>
                       <div className="stat-value text-lg text-blue-800 dark:text-blue-200">{pendingAssessment.scienceTalk || 0}%</div>
                     </div>
                     <div className="stat bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg p-3">
-                      <div className="stat-title text-xs text-green-800 dark:text-green-300">Social Talk</div>
+                      <div className="stat-title text-xs text-green-800 dark:text-green-300">Social emotional skills</div>
                       <div className="stat-value text-lg text-green-800 dark:text-green-200">{pendingAssessment.socialTalk || 0}%</div>
                     </div>
                     <div className="stat bg-purple-100 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700 rounded-lg p-3">
-                      <div className="stat-title text-xs text-purple-800 dark:text-purple-300">Literature Talk</div>
+                      <div className="stat-title text-xs text-purple-800 dark:text-purple-300">Literature skills</div>
                       <div className="stat-value text-lg text-purple-800 dark:text-purple-200">{pendingAssessment.literatureTalk || 0}%</div>
                     </div>
                     <div className="stat bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-lg p-3">
-                      <div className="stat-title text-xs text-orange-800 dark:text-orange-300">Language Development</div>
+                      <div className="stat-title text-xs text-orange-800 dark:text-orange-300">Language development skills</div>
                       <div className="stat-value text-lg text-orange-800 dark:text-orange-200">{pendingAssessment.languageDevelopment || 0}%</div>
                     </div>
                   </div>
