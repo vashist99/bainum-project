@@ -212,7 +212,7 @@ const CentersPage = () => {
                                     {centerTeachers.map((teacher) => (
                                       <div
                                         key={teacher._id}
-                                        onClick={() => navigate(`/teachers`)}
+                                        onClick={() => navigate(`/data/teacher/${teacher._id}`)}
                                         className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-base-300 hover:border-primary"
                                       >
                                         <div className="card-body p-4">

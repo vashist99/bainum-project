@@ -18,11 +18,12 @@ const PROCESSING_MESSAGES = [
   { text: "Almost there! Preparing your results...", icon: "🎯" },
 ];
 
-export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose }) {
+export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, preselectedTeacherId, preselectedCenter }) {
   const [centers, setCenters] = useState([]);
   const [teachers, setTeachers] = useState([]);
-  const [selectedCenter, setSelectedCenter] = useState("");
-  const [selectedTeacher, setSelectedTeacher] = useState("");
+  const [selectedCenter, setSelectedCenter] = useState(preselectedCenter || "");
+  const [selectedTeacher, setSelectedTeacher] = useState(preselectedTeacherId || "");
+  const isTeacherPreselected = !!(preselectedTeacherId && preselectedCenter);
   const [audioFile, setAudioFile] = useState(null);
   const [recordingDate, setRecordingDate] = useState(new Date().toISOString().split("T")[0]);
   const [uploading, setUploading] = useState(false);
@@ -32,15 +33,15 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose }) {
   const [pendingAssessment, setPendingAssessment] = useState(null);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin && !isTeacherPreselected) {
       axios.get("/api/centers").then((res) => {
         setCenters(res.data.centers || []);
       }).catch(() => setCenters([]));
     }
-  }, [isAdmin]);
+  }, [isAdmin, isTeacherPreselected]);
 
   useEffect(() => {
-    if (isAdmin && selectedCenter) {
+    if (isAdmin && !isTeacherPreselected && selectedCenter) {
       axios.get(`/api/centers/${encodeURIComponent(selectedCenter)}/teachers`).then((res) => {
         setTeachers(res.data.teachers || []);
         setSelectedTeacher("");
@@ -48,11 +49,11 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose }) {
         setTeachers([]);
         setSelectedTeacher("");
       });
-    } else {
+    } else if (!isTeacherPreselected) {
       setTeachers([]);
-      setSelectedTeacher("");
+      if (!preselectedTeacherId) setSelectedTeacher("");
     }
-  }, [isAdmin, selectedCenter]);
+  }, [isAdmin, isTeacherPreselected, selectedCenter, preselectedTeacherId]);
 
   useEffect(() => {
     if (!uploading) {
@@ -81,7 +82,7 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose }) {
       toast.error("Please select an audio file");
       return;
     }
-    if (isAdmin && !selectedTeacher) {
+    if (isAdmin && !isTeacherPreselected && !selectedTeacher) {
       toast.error("Please select a teacher");
       return;
     }
@@ -92,8 +93,10 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose }) {
       formData.append("audio", audioFile);
       formData.append("recordingDate", recordingDate);
       if (isAdmin) {
-        formData.append("teacherId", selectedTeacher);
-        formData.append("center", selectedCenter);
+        const teacherIdToUse = isTeacherPreselected ? preselectedTeacherId : selectedTeacher;
+        const centerToUse = isTeacherPreselected ? preselectedCenter : selectedCenter;
+        formData.append("teacherId", teacherIdToUse);
+        formData.append("center", centerToUse);
       }
 
       const response = await axios.post("/api/whisper/classroom", formData, {
@@ -186,24 +189,33 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose }) {
           {pendingAssessment && (
             <div className="mb-4">
               <label className="label">
-                <span className="label-text font-semibold">Assessment Scores</span>
+                <span className="label-text font-semibold">Words Per Minute</span>
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="stat bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg p-3">
-                  <div className="stat-title text-xs text-blue-800 dark:text-blue-300">Science skills</div>
-                  <div className="stat-value text-lg text-blue-800 dark:text-blue-200">{pendingAssessment.scienceTalk || 0}%</div>
+              <div className="stat bg-primary/10 border border-primary/30 rounded-lg p-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                  {[
+                    { key: 'science', label: 'Science', color: 'text-blue-600' },
+                    { key: 'social', label: 'Social', color: 'text-green-600' },
+                    { key: 'literature', label: 'Literature', color: 'text-purple-600' },
+                    { key: 'language', label: 'Language', color: 'text-orange-600' }
+                  ].map(({ key, label, color }) => {
+                    const val = pendingAssessment.categoryWPM?.[key];
+                    return (
+                      <div key={key} className={`text-sm ${color}`}>
+                        <span className="font-medium">{label}:</span> {val != null ? `${Math.round(val * 10) / 10}` : '—'} WPM
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="stat bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg p-3">
-                  <div className="stat-title text-xs text-green-800 dark:text-green-300">Social emotional skills</div>
-                  <div className="stat-value text-lg text-green-800 dark:text-green-200">{pendingAssessment.socialTalk || 0}%</div>
+                <div className="stat-value text-2xl text-primary">
+                  {pendingAssessment.wordsPerMinute != null
+                    ? `${Math.round((pendingAssessment.wordsPerMinute || 0) * 10) / 10} WPM`
+                    : 'N/A'} <span className="text-sm font-normal text-base-content/70">(overall)</span>
                 </div>
-                <div className="stat bg-purple-100 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700 rounded-lg p-3">
-                  <div className="stat-title text-xs text-purple-800 dark:text-purple-300">Literature skills</div>
-                  <div className="stat-value text-lg text-purple-800 dark:text-purple-200">{pendingAssessment.literatureTalk || 0}%</div>
-                </div>
-                <div className="stat bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-lg p-3">
-                  <div className="stat-title text-xs text-orange-800 dark:text-orange-300">Language development skills</div>
-                  <div className="stat-value text-lg text-orange-800 dark:text-orange-200">{pendingAssessment.languageDevelopment || 0}%</div>
+                <div className="stat-desc text-sm text-base-content/70">
+                  {pendingAssessment.wordsPerMinute != null
+                    ? `${pendingAssessment.wordCount || 0} words • ${pendingAssessment.durationSeconds ? `${Math.round(pendingAssessment.durationSeconds / 60 * 10) / 10} min` : '—'}`
+                    : 'Duration not available from transcription'}
                 </div>
               </div>
             </div>
@@ -235,7 +247,7 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose }) {
         </h3>
         <div className="divider" />
 
-        {isAdmin && (
+        {isAdmin && !isTeacherPreselected && (
           <>
             <div className="form-control w-full mb-4">
               <label className="label">
@@ -334,7 +346,7 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose }) {
           <button
             onClick={handleUpload}
             className="btn btn-primary gap-2"
-            disabled={!audioFile || uploading || (isAdmin && !selectedTeacher)}
+            disabled={!audioFile || uploading || (isAdmin && !isTeacherPreselected && !selectedTeacher)}
           >
             {uploading ? (
               <>Processing...</>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
-import { Plus, Edit, Trash2, ChevronDown, ChevronRight, User, Mail, X } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronDown, ChevronRight, User, Mail, Building2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
@@ -11,12 +11,16 @@ const TeachersPage = () => {
   const { isAdmin } = useAuth();
   const [teachers, setTeachers] = useState([]);
   const [children, setChildren] = useState([]);
+  const [centers, setCenters] = useState([]);
+  const [selectedCenter, setSelectedCenter] = useState("");
   const [loading, setLoading] = useState(true);
   const [expandedTeachers, setExpandedTeachers] = useState(new Set());
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [selectedTeacherForInvite, setSelectedTeacherForInvite] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [sortByCenter, setSortByCenter] = useState(null); // null | 'asc' | 'desc'
+  const [sortByLanguage, setSortByLanguage] = useState(null); // null | 'asc' | 'desc'
 
   // Load teachers from API on component mount
   useEffect(() => {
@@ -55,6 +59,56 @@ const TeachersPage = () => {
     fetchChildren();
   }, [isAdmin]);
 
+  // Load centers from API if user is admin
+  useEffect(() => {
+    const fetchCenters = async () => {
+      if (isAdmin()) {
+        try {
+          const response = await axios.get("/api/centers");
+          setCenters(response.data.centers || []);
+        } catch (error) {
+          console.error("Error fetching centers:", error);
+          setCenters([]);
+        }
+      }
+    };
+
+    fetchCenters();
+  }, [isAdmin]);
+
+  const filteredTeachers = (() => {
+    let list = selectedCenter
+      ? teachers.filter((t) => t.center === selectedCenter)
+      : teachers;
+    if (sortByCenter) {
+      list = [...list].sort((a, b) => {
+        const ca = (a.center || '').toLowerCase();
+        const cb = (b.center || '').toLowerCase();
+        const cmp = ca.localeCompare(cb);
+        return sortByCenter === 'asc' ? cmp : -cmp;
+      });
+    }
+    if (sortByLanguage) {
+      list = [...list].sort((a, b) => {
+        const la = getPrimaryLanguageForTeacher(a.name).toLowerCase();
+        const lb = getPrimaryLanguageForTeacher(b.name).toLowerCase();
+        const cmp = la.localeCompare(lb);
+        return sortByLanguage === 'asc' ? cmp : -cmp;
+      });
+    }
+    return list;
+  })();
+
+  const handleSortByCenter = () => {
+    setSortByLanguage(null);
+    setSortByCenter(sortByCenter === 'asc' ? 'desc' : sortByCenter === 'desc' ? null : 'asc');
+  };
+
+  const handleSortByLanguage = () => {
+    setSortByCenter(null);
+    setSortByLanguage(sortByLanguage === 'asc' ? 'desc' : sortByLanguage === 'desc' ? null : 'asc');
+  };
+
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this teacher?")) {
       try {
@@ -86,8 +140,19 @@ const TeachersPage = () => {
       const teacherNameTrimmed = teacherName?.trim() || '';
       return childLeadTeacher === teacherNameTrimmed;
     });
-    console.log(`Children for teacher "${teacherName}":`, filtered.length, filtered);
     return filtered;
+  };
+
+  /** Returns the most common primary language among teacher's children, or '' if none */
+  const getPrimaryLanguageForTeacher = (teacherName) => {
+    const teacherChildren = getChildrenForTeacher(teacherName);
+    if (teacherChildren.length === 0) return '';
+    const langCounts = {};
+    teacherChildren.forEach(c => {
+      const lang = (c.primaryLanguage || '').trim() || '—';
+      langCounts[lang] = (langCounts[lang] || 0) + 1;
+    });
+    return Object.entries(langCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
   };
 
   const openInviteModal = (teacher) => {
@@ -209,6 +274,34 @@ const TeachersPage = () => {
           </div>
         </div>
 
+        {isAdmin() && (
+          <div className="card bg-base-100 shadow-xl mb-6">
+            <div className="card-body">
+              <div className="form-control w-full max-w-xs">
+                <label className="label">
+                  <span className="label-text font-semibold flex items-center gap-2">
+                    <Building2 className="w-5 h-5" />
+                    Filter by Center
+                  </span>
+                </label>
+                <select
+                  className="select select-bordered select-primary w-full"
+                  value={selectedCenter}
+                  onChange={(e) => setSelectedCenter(e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="">All centers</option>
+                  {centers.map((c) => (
+                    <option key={c._id} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             {loading ? (
@@ -226,19 +319,44 @@ const TeachersPage = () => {
                       <th>Email</th>
                       <th>Education</th>
                       <th>Date of Birth</th>
-                      <th>Center</th>
+                      <th>
+                        <button
+                          type="button"
+                          onClick={handleSortByCenter}
+                          className="flex items-center gap-1 hover:underline"
+                        >
+                          Center
+                          {sortByCenter === 'asc' && <ArrowUp className="w-3 h-3" />}
+                          {sortByCenter === 'desc' && <ArrowDown className="w-3 h-3" />}
+                          {!sortByCenter && <ArrowUpDown className="w-3 h-3 opacity-50" />}
+                        </button>
+                      </th>
+                      <th>
+                        <button
+                          type="button"
+                          onClick={handleSortByLanguage}
+                          className="flex items-center gap-1 hover:underline"
+                        >
+                          Language
+                          {sortByLanguage === 'asc' && <ArrowUp className="w-3 h-3" />}
+                          {sortByLanguage === 'desc' && <ArrowDown className="w-3 h-3" />}
+                          {!sortByLanguage && <ArrowUpDown className="w-3 h-3 opacity-50" />}
+                        </button>
+                      </th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {teachers.length === 0 ? (
+                    {filteredTeachers.length === 0 ? (
                       <tr>
-                        <td colSpan={isAdmin() ? 8 : 7} className="text-center text-base-content/60">
-                          No teachers added yet. Click "Add Teacher" to get started.
+                        <td colSpan={isAdmin() ? 9 : 8} className="text-center text-base-content/60">
+                          {selectedCenter
+                            ? `No teachers found at ${selectedCenter}.`
+                            : "No teachers added yet. Click \"Add Teacher\" to get started."}
                         </td>
                       </tr>
                     ) : (
-                      teachers.flatMap((teacher, index) => {
+                      filteredTeachers.flatMap((teacher, index) => {
                         const isExpanded = expandedTeachers.has(teacher._id);
                         const teacherChildren = getChildrenForTeacher(teacher.name);
                         const hasChildren = teacherChildren.length > 0;
@@ -274,7 +392,21 @@ const TeachersPage = () => {
                             <td>{index + 1}</td>
                             <td>
                               <div className="flex items-center gap-2">
-                                {teacher.name}
+                                {isAdmin() ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/data/teacher/${teacher._id}`);
+                                    }}
+                                    className="link link-primary font-semibold hover:underline inline-flex items-center gap-1"
+                                    title="View classroom talk data"
+                                  >
+                                    {teacher.name}
+                                    <ChevronRight className="w-4 h-4" />
+                                  </button>
+                                ) : (
+                                  teacher.name
+                                )}
                                 {isAdmin() && hasChildren && (
                                   <span className="badge badge-sm badge-secondary">
                                     {teacherChildren.length}
@@ -301,6 +433,7 @@ const TeachersPage = () => {
                                 {teacher.center}
                               </span>
                             </td>
+                            <td>{getPrimaryLanguageForTeacher(teacher.name) || "—"}</td>
                             <td onClick={(e) => e.stopPropagation()}>
                               <div className="flex gap-2">
                                 <button 
@@ -326,7 +459,7 @@ const TeachersPage = () => {
                         if (isAdmin() && isExpanded) {
                           rows.push(
                             <tr key={`${teacher._id}-children`}>
-                              <td colSpan={isAdmin() ? 8 : 7} className="bg-base-200 p-0">
+                              <td colSpan={isAdmin() ? 9 : 8} className="bg-base-200 p-0">
                                 <div className="p-4 pl-12">
                                   <h4 className="font-semibold mb-3 text-sm text-base-content/70">
                                     Children Under Supervision ({teacherChildren.length})

@@ -137,6 +137,23 @@ const EditChildForm = () => {
     }
   };
 
+  const diagnoses = [
+    "None",
+    "Autism Spectrum Disorder",
+    "Attention Deficit Hyperactivity Disorder (ADHD)",
+    "Speech/Language Delay",
+    "Developmental Delay",
+    "Intellectual Disability",
+    "Down Syndrome",
+    "Cerebral Palsy",
+    "Hearing Impairment",
+    "Visual Impairment",
+    "Learning Disability",
+    "Other",
+    "Yes", // legacy
+    "No",  // legacy
+  ];
+
   const languages = [
     "English",
     "Spanish",
@@ -258,9 +275,12 @@ const EditChildForm = () => {
                   value={formData.diagnosis}
                   onChange={handleInputChange}
                 >
-                  <option value="">Select diagnosis status</option>
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
+                  <option value="">Select diagnosis</option>
+                  {diagnoses.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
                 </select>
               </div>
 

@@ -74,20 +74,28 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Add response interceptor to log errors
+// Add response interceptor to handle token expiry and log errors
 apiClient.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
+    // On 401 or 403, session may be expired (JWT invalid/expired) - clear and redirect to login
+    const status = error.response?.status;
+    if ((status === 401 || status === 403) && !error.config?.url?.includes('login')) {
+      localStorage.removeItem('user');
+      // Redirect to login with a flag so the page can show a message
+      window.location.href = '/?session_expired=1';
+      return Promise.reject(error);
+    }
     // Log 403 errors for teacher invitations
-    if (error.config?.url?.includes('teacher-invitations') && error.response?.status === 403) {
+    if (error.config?.url?.includes('teacher-invitations') && status === 403) {
       console.error('403 Forbidden on teacher invitation:', {
         url: error.config.url,
-        status: error.response.status,
-        message: error.response.data?.message,
-        headers: error.response.headers,
-        requestHeaders: error.config.headers
+        status,
+        message: error.response?.data?.message,
+        headers: error.response?.headers,
+        requestHeaders: error.config?.headers
       });
     }
     return Promise.reject(error);

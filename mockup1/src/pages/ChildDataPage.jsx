@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
 import { ArrowLeft, User, Calendar, Languages, Stethoscope, Users, FileText, BookOpen, MessageCircle, Microscope, Brain, Plus, Trash2, Upload, Mic, Check, X, Download } from "lucide-react";
+import { LanguageDevelopmentCharts } from "../components/LanguageDevelopmentCharts";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
-import ReactSpeedometer, { CustomSegmentLabelPosition } from "react-d3-speedometer";
 import { highlightRAGSegments, getSegmentsForHighlighting } from "../utils/ragHighlightSegments.js";
 import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
 
@@ -55,7 +55,7 @@ const ChildDataPage = () => {
   const [audioFile, setAudioFile] = useState(null);
   const [recordingDate, setRecordingDate] = useState(new Date().toISOString().split('T')[0]); // Default to today
   const [uploading, setUploading] = useState(false);
-  const [latestAssessment, setLatestAssessment] = useState(null);
+  const [, setLatestAssessment] = useState(null);
   const [allAssessments, setAllAssessments] = useState([]);
   const [viewMode, setViewMode] = useState("dotmatrix"); // "dotmatrix" or "semicircular"
   const [showTranscriptModal, setShowTranscriptModal] = useState(false);
@@ -65,6 +65,7 @@ const ChildDataPage = () => {
   const [allChildren, setAllChildren] = useState([]);
   const [loadingTeachers, setLoadingTeachers] = useState(false);
   const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
+  const [cohortThresholdsByCategory, setCohortThresholdsByCategory] = useState(null);
 
   // Rotate processing messages while audio is uploading
   useEffect(() => {
@@ -181,6 +182,13 @@ const ChildDataPage = () => {
 
     fetchAllAssessments();
   }, [childId]);
+
+  // Load cohort WPM stats for children (used for semicircular dial zones)
+  useEffect(() => {
+    axios.get(`/api/assessments/cohort-stats/children`).then((res) => {
+      setCohortThresholdsByCategory(res.data?.cohortStats || null);
+    }).catch(() => setCohortThresholdsByCategory(null));
+  }, []);
 
   // Load teachers and all children (for admin/teacher views)
   useEffect(() => {
@@ -330,10 +338,15 @@ const ChildDataPage = () => {
       const assessmentResponse = await axios.get(`/api/assessments/child/${childId}/latest`);
       setLatestAssessment(assessmentResponse.data.assessment);
       
-      // Reload all assessments for aggregation
+// Reload all assessments for aggregation
       const allAssessmentsResponse = await axios.get(`/api/assessments/child/${childId}`);
       setAllAssessments(allAssessmentsResponse.data.assessments || []);
-      
+
+      // Refetch children cohort stats (recalculated on accept) so dial thresholds update
+      axios.get(`/api/assessments/cohort-stats/children`).then((res) => {
+        setCohortThresholdsByCategory(res.data?.cohortStats || null);
+      }).catch(() => {});
+
       // Close transcript modal and reset
       setShowTranscriptModal(false);
       setPendingTranscript(null);
@@ -354,114 +367,27 @@ const ChildDataPage = () => {
   };
 
   // Get language development data from latest assessment
-  const languageData = useMemo(() => {
-    if (latestAssessment) {
-      return {
-        scienceTalk: latestAssessment.scienceTalk || 0,
-        socialTalk: latestAssessment.socialTalk || 0,
-        literatureTalk: latestAssessment.literatureTalk || 0,
-        languageDevelopment: latestAssessment.languageDevelopment || 0,
-      };
-    }
-    return null;
-  }, [latestAssessment]);
-
-  // Group assessments by month and aggregate keyword counts
-  const monthlyKeywordData = useMemo(() => {
-    try {
-      const monthlyData = {};
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      
-      // Initialize all months with 0 counts
-      monthNames.forEach((month, index) => {
-        monthlyData[index] = {
-          month,
-          science: 0,
-          social: 0,
-          literature: 0,
-          language: 0
-        };
-      });
-
-      // Aggregate assessments by month
-      if (Array.isArray(allAssessments)) {
-        allAssessments.forEach(assessment => {
-          if (assessment && assessment.date && assessment.keywordCounts) {
-            try {
-              const date = new Date(assessment.date);
-              if (!isNaN(date.getTime())) {
-                const monthIndex = date.getMonth(); // 0-11
-                
-                if (monthlyData[monthIndex]) {
-                  monthlyData[monthIndex].science += assessment.keywordCounts.science || 0;
-                  monthlyData[monthIndex].social += assessment.keywordCounts.social || 0;
-                  monthlyData[monthIndex].literature += assessment.keywordCounts.literature || 0;
-                  monthlyData[monthIndex].language += assessment.keywordCounts.language || 0;
-                }
-              }
-            } catch (error) {
-              console.error("Error processing assessment date:", error);
-            }
-          }
-        });
-      }
-
-      return monthlyData;
-    } catch (error) {
-      console.error("Error in getMonthlyKeywordData:", error);
-      // Return empty data structure on error
-      const emptyData = {};
-      for (let i = 0; i < 12; i++) {
-        emptyData[i] = { month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i], science: 0, social: 0, literature: 0, language: 0 };
-      }
-      return emptyData;
-    }
+  // Average words per minute across all assessments with duration data
+  const averageWPM = useMemo(() => {
+    const validWPM = (Array.isArray(allAssessments) ? allAssessments : [])
+      .map((a) => a?.wordsPerMinute)
+      .filter((w) => w != null && !isNaN(w));
+    if (validWPM.length === 0) return null;
+    return validWPM.reduce((s, w) => s + w, 0) / validWPM.length;
   }, [allAssessments]);
 
-  // Calculate total aggregated keyword counts for speedometer
-  const totalKeywordCounts = useMemo(() => {
-    try {
-      const totals = {
-      scienceTalk: 0,
-      socialTalk: 0,
-      literatureTalk: 0,
-      languageDevelopment: 0
-    };
-
-      if (Array.isArray(allAssessments)) {
-        allAssessments.forEach(assessment => {
-          if (assessment && assessment.keywordCounts) {
-            totals.scienceTalk += assessment.keywordCounts.science || 0;
-            totals.socialTalk += assessment.keywordCounts.social || 0;
-            totals.literatureTalk += assessment.keywordCounts.literature || 0;
-            totals.languageDevelopment += assessment.keywordCounts.language || 0;
-          }
-        });
-      }
-
-      return totals;
-    } catch (error) {
-      console.error("Error in getTotalKeywordCounts:", error);
-      return { scienceTalk: 0, socialTalk: 0, literatureTalk: 0, languageDevelopment: 0 };
-    }
+  // Average WPM per category (science, social, literature, language)
+  const averageCategoryWPM = useMemo(() => {
+    const cats = ['science', 'social', 'literature', 'language'];
+    const result = {};
+    cats.forEach((cat) => {
+      const valid = (Array.isArray(allAssessments) ? allAssessments : [])
+        .map((a) => a?.categoryWPM?.[cat])
+        .filter((w) => w != null && !isNaN(w));
+      result[cat] = valid.length > 0 ? valid.reduce((s, w) => s + w, 0) / valid.length : null;
+    });
+    return result;
   }, [allAssessments]);
-
-  // Calculate dynamic max value for speedometer based on highest total
-  const speedometerMax = useMemo(() => {
-    try {
-      const maxValue = Math.max(
-        totalKeywordCounts.scienceTalk,
-        totalKeywordCounts.socialTalk,
-        totalKeywordCounts.literatureTalk,
-        totalKeywordCounts.languageDevelopment
-      );
-      // Round up to nearest 50, with minimum of 200
-      return Math.max(200, Math.ceil(maxValue / 50) * 50);
-    } catch (error) {
-      console.error("Error in getSpeedometerMax:", error);
-      return 200;
-    }
-  }, [totalKeywordCounts]);
 
   // Calculate age in months from date of birth
   const calculateAgeInMonths = (dateOfBirth) => {
@@ -485,99 +411,6 @@ const ChildDataPage = () => {
   };
 
   const ageInMonths = calculateAgeInMonths(child?.dateOfBirth);
-
-  // Semicircular Dial Component
-  const SemicircularDial = ({ value, max = 200, color, label, description, icon: Icon }) => {
-    // Extract color value for custom segments
-    const getColorValue = (colorClass) => {
-      if (colorClass.includes('blue')) return '#2563eb';
-      if (colorClass.includes('green')) return '#16a34a';
-      if (colorClass.includes('purple')) return '#9333ea';
-      if (colorClass.includes('orange')) return '#ea580c';
-      if (colorClass.includes('indigo')) return '#4f46e5';
-      return '#6366f1';
-    };
-
-    try {
-      return (
-        <div className="flex flex-col items-center p-4">
-          <div className="text-center mb-4">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              {Icon && <Icon className={`w-5 h-5 ${color}`} />}
-              <h3 className={`font-bold text-lg ${color.replace('600', '800')} dark:${color.replace('600', '200')}`}>
-                {label}
-              </h3>
-            </div>
-            <p className={`text-sm ${color.replace('600', '700')} dark:${color.replace('600', '300')}`}>
-              {description}
-            </p>
-          </div>
-          <div className="flex flex-col items-center" style={{ width: '100%', minHeight: '240px', overflow: 'visible' }}>
-            <ReactSpeedometer
-              maxValue={max}
-              minValue={0}
-              value={Math.round(Math.max(0, Math.min(value, max)))}
-              needleColor={getColorValue(color)}
-              customSegmentStops={(() => {
-                // Generate segment stops dynamically based on max value
-                const segments = 8;
-                const stops = [];
-                for (let i = 0; i <= segments; i++) {
-                  stops.push(Math.round((max / segments) * i));
-                }
-                return stops;
-              })()}
-              segmentColors={[
-                '#f59e0b', // Yellow: 0-25 (0-12.5%)
-                '#f59e0b', // Yellow: 25-50 (12.5-25%)
-                '#22c55e', // Green: 50-75 (25-37.5%)
-                '#22c55e', // Green: 75-100 (37.5-50%)
-                '#22c55e', // Green: 100-125 (50-62.5%)
-                '#22c55e', // Green: 125-150 (62.5-75%)
-                '#ef4444', // Red: 150-175 (75-87.5%)
-                '#ef4444', // Red: 175-200 (87.5-100%)
-              ]}
-              segmentValueFormatter={(value) => {
-                // Show labels at all stop points (segment boundaries)
-                return String(Math.round(value));
-              }}
-              ringWidth={30}
-              needleTransitionDuration={1000}
-              needleTransition="easeElastic"
-              textColor="#ffffff"
-              valueTextFontSize="16px"
-              labelFontSize="12px"
-              currentValueText={`${Math.round(value)} words`}
-              width={280}
-              height={200}
-              paddingHorizontal={15}
-              paddingVertical={30}
-            />
-          </div>
-        </div>
-      );
-    } catch (error) {
-      console.error('Error rendering speedometer:', error);
-      return (
-        <div className="flex flex-col items-center p-4">
-          <div className="text-center mb-4">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              {Icon && <Icon className={`w-5 h-5 ${color}`} />}
-              <h3 className={`font-bold text-lg ${color.replace('600', '800')}`}>
-                {label}
-              </h3>
-            </div>
-            <p className={`text-sm ${color.replace('600', '700')}`}>
-              {description}
-            </p>
-          </div>
-          <div className="text-3xl font-bold mt-4" style={{ color: getColorValue(color) }}>
-            {Math.round(value)} words
-          </div>
-        </div>
-      );
-    }
-  };
 
   if (loading) {
     return (
@@ -709,7 +542,7 @@ const ChildDataPage = () => {
                 <div className="stat-figure text-primary">
                   <Users className="w-8 h-8" />
                 </div>
-                <div className="stat-title">Lead Teacher</div>
+                <div className="stat-title">Teacher</div>
                 {isAdmin() && teachers.length > 0 ? (
                   <div className="stat-value text-lg">
                     <select
@@ -814,440 +647,52 @@ const ChildDataPage = () => {
           </div>
         )}
 
-        {/* Language Development Section */}
-        <div className="card bg-base-100 shadow-xl mb-6">
-          <div className="card-body">
-            <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
-              <Languages className="w-6 h-6 text-primary" />
-              Language Development Analysis {viewMode === "dotmatrix" ? "- Year Overview" : ""}
-            </h2>
-            <div className="divider"></div>
-            
-            {viewMode === "semicircular" ? (
-              // Semicircular Dials View
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-6">
-                <SemicircularDial
-                  value={totalKeywordCounts.scienceTalk || 0}
-                  max={speedometerMax}
-                  color="text-blue-600"
-                  label="Talk to support science skills"
-                  description="Scientific vocabulary & concepts"
-                  icon={Microscope}
-                />
-                <SemicircularDial
-                  value={totalKeywordCounts.socialTalk || 0}
-                  max={speedometerMax}
-                  color="text-green-600"
-                  label="Talk to support social emotional skills"
-                  description="Communication & interaction"
-                  icon={MessageCircle}
-                />
-                <SemicircularDial
-                  value={totalKeywordCounts.literatureTalk || 0}
-                  max={speedometerMax}
-                  color="text-purple-600"
-                  label="Talk to support literature skills"
-                  description="Storytelling & narrative skills"
-                  icon={BookOpen}
-                />
-                <SemicircularDial
-                  value={totalKeywordCounts.languageDevelopment || 0}
-                  max={speedometerMax}
-                  color="text-orange-600"
-                  label="Talk to support language development skills"
-                  description="Overall language growth"
-                  icon={Brain}
-                />
-              </div>
-            ) : (
-              // Dot Matrix View
-              <div className="space-y-8">
-              {/* Talk to support science skills - Year View */}
-              <div className="border-b border-base-300 pb-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Microscope className="w-6 h-6 text-blue-600" />
-                  <div>
-                    <h3 className="font-bold text-lg text-blue-800 dark:text-blue-200">Talk to support science skills</h3>
-                    <p className="text-sm text-blue-700 dark:text-blue-300">Scientific vocabulary & concepts</p>
-                  </div>
-                </div>
-                {/* Monthly Grid */}
-                <div className="flex flex-col gap-3">
-                  {/* Month Labels */}
-                  <div className="flex gap-3 justify-center">
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month) => (
-                      <div 
-                        key={month} 
-                        className="text-xs text-base-content/60 text-center w-16"
-                      >
-                        {month}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Month Boxes Grid */}
-                  <div className="flex gap-3 justify-center">
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, monthIndex) => {
-                      const monthData = monthlyKeywordData?.[monthIndex] || {};
-                      const wordCount = monthData.science || 0;
-                      // Intensity based on words: 0-80, 80-110, 110-140, 140-170, 170+
-                      const intensity = wordCount < 80 ? 0 : wordCount < 110 ? 1 : wordCount < 140 ? 2 : wordCount < 170 ? 3 : 4;
-                      const colors = [
-                        'bg-blue-100 dark:bg-blue-950/20',
-                        'bg-blue-300 dark:bg-blue-800/50',
-                        'bg-blue-500 dark:bg-blue-600',
-                        'bg-blue-600 dark:bg-blue-500',
-                        'bg-blue-700 dark:bg-blue-400'
-                      ];
-                      return (
-                        <div
-                          key={month}
-                          className={`w-16 h-16 rounded-lg ${colors[intensity]} hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer flex flex-col items-center justify-center`}
-                          title={`${month}: ${wordCount} words`}
-                        >
-                          <span className="text-xs font-semibold text-base-content/70">{wordCount}</span>
-                          <span className="text-[10px] text-base-content/50">words</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  {/* Legend */}
-                  <div className="flex items-center justify-center gap-2 mt-2 text-xs text-base-content/60">
-                    <span>Fewer words</span>
-                    <div className="flex gap-1">
-                      <div className="w-4 h-4 rounded-lg bg-blue-100 dark:bg-blue-950/20"></div>
-                      <div className="w-4 h-4 rounded-lg bg-blue-300 dark:bg-blue-800/50"></div>
-                      <div className="w-4 h-4 rounded-lg bg-blue-500 dark:bg-blue-600"></div>
-                      <div className="w-4 h-4 rounded-lg bg-blue-600 dark:bg-blue-500"></div>
-                      <div className="w-4 h-4 rounded-lg bg-blue-700 dark:bg-blue-400"></div>
-                    </div>
-                    <span>More words</span>
-                  </div>
-                </div>
-              </div>
+        <LanguageDevelopmentCharts
+          assessments={allAssessments}
+          viewMode={viewMode}
+          title={`Language Development Analysis ${viewMode === "dotmatrix" ? "- Year Overview" : ""}`}
+          showWordScores
+          cohortThresholdsByCategory={cohortThresholdsByCategory}
+        />
 
-              {/* Talk to support social emotional skills - Year View */}
-              <div className="border-b border-base-300 pb-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <MessageCircle className="w-6 h-6 text-green-600" />
-                  <div>
-                    <h3 className="font-bold text-lg text-green-800 dark:text-green-200">Talk to support social emotional skills</h3>
-                    <p className="text-sm text-green-700 dark:text-green-300">Communication & interaction</p>
-                  </div>
-                </div>
-                {/* Monthly Grid */}
-                <div className="flex flex-col gap-3">
-                  {/* Month Labels */}
-                  <div className="flex gap-3 justify-center">
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month) => (
-                      <div 
-                        key={month} 
-                        className="text-xs text-base-content/60 text-center w-16"
-                      >
-                        {month}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Month Boxes Grid */}
-                  <div className="flex gap-3 justify-center">
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, monthIndex) => {
-                      const monthData = monthlyKeywordData?.[monthIndex] || {};
-                      const wordCount = monthData.social || 0;
-                      const intensity = wordCount < 80 ? 0 : wordCount < 110 ? 1 : wordCount < 140 ? 2 : wordCount < 170 ? 3 : 4;
-                      const colors = [
-                        'bg-green-100 dark:bg-green-950/20',
-                        'bg-green-300 dark:bg-green-800/50',
-                        'bg-green-500 dark:bg-green-600',
-                        'bg-green-600 dark:bg-green-500',
-                        'bg-green-700 dark:bg-green-400'
-                      ];
-                      return (
-                        <div
-                          key={month}
-                          className={`w-16 h-16 rounded-lg ${colors[intensity]} hover:ring-2 hover:ring-green-500 transition-all cursor-pointer flex flex-col items-center justify-center`}
-                          title={`${month}: ${wordCount} words`}
-                        >
-                          <span className="text-xs font-semibold text-base-content/70">{wordCount}</span>
-                          <span className="text-[10px] text-base-content/50">words</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  {/* Legend */}
-                  <div className="flex items-center justify-center gap-2 mt-2 text-xs text-base-content/60">
-                    <span>Fewer words</span>
-                    <div className="flex gap-1">
-                      <div className="w-4 h-4 rounded-lg bg-green-100 dark:bg-green-950/20"></div>
-                      <div className="w-4 h-4 rounded-lg bg-green-300 dark:bg-green-800/50"></div>
-                      <div className="w-4 h-4 rounded-lg bg-green-500 dark:bg-green-600"></div>
-                      <div className="w-4 h-4 rounded-lg bg-green-600 dark:bg-green-500"></div>
-                      <div className="w-4 h-4 rounded-lg bg-green-700 dark:bg-green-400"></div>
-                    </div>
-                    <span>More words</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Talk to support literature skills - Year View */}
-              <div className="border-b border-base-300 pb-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <BookOpen className="w-6 h-6 text-purple-600" />
-                  <div>
-                    <h3 className="font-bold text-lg text-purple-800 dark:text-purple-200">Talk to support literature skills</h3>
-                    <p className="text-sm text-purple-700 dark:text-purple-300">Storytelling & narrative skills</p>
-                  </div>
-                </div>
-                {/* Monthly Grid */}
-                <div className="flex flex-col gap-3">
-                  {/* Month Labels */}
-                  <div className="flex gap-3 justify-center">
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month) => (
-                      <div 
-                        key={month} 
-                        className="text-xs text-base-content/60 text-center w-16"
-                      >
-                        {month}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Month Boxes Grid */}
-                  <div className="flex gap-3 justify-center">
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, monthIndex) => {
-                      const monthData = monthlyKeywordData?.[monthIndex] || {};
-                      const wordCount = monthData.literature || 0;
-                      const intensity = wordCount < 80 ? 0 : wordCount < 110 ? 1 : wordCount < 140 ? 2 : wordCount < 170 ? 3 : 4;
-                      const colors = [
-                        'bg-purple-100 dark:bg-purple-950/20',
-                        'bg-purple-300 dark:bg-purple-800/50',
-                        'bg-purple-500 dark:bg-purple-600',
-                        'bg-purple-600 dark:bg-purple-500',
-                        'bg-purple-700 dark:bg-purple-400'
-                      ];
-                      return (
-                        <div
-                          key={month}
-                          className={`w-16 h-16 rounded-lg ${colors[intensity]} hover:ring-2 hover:ring-purple-500 transition-all cursor-pointer flex flex-col items-center justify-center`}
-                          title={`${month}: ${wordCount} words`}
-                        >
-                          <span className="text-xs font-semibold text-base-content/70">{wordCount}</span>
-                          <span className="text-[10px] text-base-content/50">words</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  {/* Legend */}
-                  <div className="flex items-center justify-center gap-2 mt-2 text-xs text-base-content/60">
-                    <span>Fewer words</span>
-                    <div className="flex gap-1">
-                      <div className="w-4 h-4 rounded-lg bg-purple-100 dark:bg-purple-950/20"></div>
-                      <div className="w-4 h-4 rounded-lg bg-purple-300 dark:bg-purple-800/50"></div>
-                      <div className="w-4 h-4 rounded-lg bg-purple-500 dark:bg-purple-600"></div>
-                      <div className="w-4 h-4 rounded-lg bg-purple-600 dark:bg-purple-500"></div>
-                      <div className="w-4 h-4 rounded-lg bg-purple-700 dark:bg-purple-400"></div>
-                    </div>
-                    <span>More words</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Talk to support language development skills - Year View */}
-              <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <Brain className="w-6 h-6 text-orange-600" />
-                  <div>
-                    <h3 className="font-bold text-lg text-orange-800 dark:text-orange-200">Talk to support language development skills</h3>
-                    <p className="text-sm text-orange-700 dark:text-orange-300">Overall language growth</p>
-                  </div>
-                </div>
-                {/* Monthly Grid */}
-                <div className="flex flex-col gap-3">
-                  {/* Month Labels */}
-                  <div className="flex gap-3 justify-center">
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month) => (
-                      <div 
-                        key={month} 
-                        className="text-xs text-base-content/60 text-center w-16"
-                      >
-                        {month}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Month Boxes Grid */}
-                  <div className="flex gap-3 justify-center">
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, monthIndex) => {
-                      const monthData = monthlyKeywordData?.[monthIndex] || {};
-                      const wordCount = monthData.language || 0;
-                      const intensity = wordCount < 80 ? 0 : wordCount < 110 ? 1 : wordCount < 140 ? 2 : wordCount < 170 ? 3 : 4;
-                      const colors = [
-                        'bg-orange-100 dark:bg-orange-950/20',
-                        'bg-orange-300 dark:bg-orange-800/50',
-                        'bg-orange-500 dark:bg-orange-600',
-                        'bg-orange-600 dark:bg-orange-500',
-                        'bg-orange-700 dark:bg-orange-400'
-                      ];
-                      return (
-                        <div
-                          key={month}
-                          className={`w-16 h-16 rounded-lg ${colors[intensity]} hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer flex flex-col items-center justify-center`}
-                          title={`${month}: ${wordCount} words`}
-                        >
-                          <span className="text-xs font-semibold text-base-content/70">{wordCount}</span>
-                          <span className="text-[10px] text-base-content/50">words</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  {/* Legend */}
-                  <div className="flex items-center justify-center gap-2 mt-2 text-xs text-base-content/60">
-                    <span>Fewer words</span>
-                    <div className="flex gap-1">
-                      <div className="w-4 h-4 rounded-lg bg-orange-100 dark:bg-orange-950/20"></div>
-                      <div className="w-4 h-4 rounded-lg bg-orange-300 dark:bg-orange-800/50"></div>
-                      <div className="w-4 h-4 rounded-lg bg-orange-500 dark:bg-orange-600"></div>
-                      <div className="w-4 h-4 rounded-lg bg-orange-600 dark:bg-orange-500"></div>
-                      <div className="w-4 h-4 rounded-lg bg-orange-700 dark:bg-orange-400"></div>
-                    </div>
-                    <span>More words</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            )}
-
-            {/* Language Development Insights */}
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-3">Language Development Insights</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="card bg-base-200">
-                  <div className="card-body p-4">
-                    <h4 className="font-semibold text-sm mb-2">Strengths</h4>
-                    <ul className="text-sm space-y-1">
-                      {languageData?.scienceTalk > 80 && <li>• Strong scientific vocabulary</li>}
-                      {languageData?.socialTalk > 80 && <li>• Excellent social communication</li>}
-                      {languageData?.literatureTalk > 80 && <li>• Advanced storytelling skills</li>}
-                      {languageData?.languageDevelopment > 80 && <li>• Rapid language development</li>}
-                      {(!languageData || Object.values(languageData).every(v => v <= 80)) && 
-                        <li>• Consistent progress across all areas</li>
-                      }
-                    </ul>
-                  </div>
-                </div>
-                
-                <div className="card bg-base-200">
-                  <div className="card-body p-4">
-                    <h4 className="font-semibold text-sm mb-2">Areas for Growth</h4>
-                    <ul className="text-sm space-y-1">
-                      {languageData?.scienceTalk < 70 && <li>• Science vocabulary development</li>}
-                      {languageData?.socialTalk < 70 && <li>• Social interaction skills</li>}
-                      {languageData?.literatureTalk < 70 && <li>• Narrative and storytelling</li>}
-                      {languageData?.languageDevelopment < 70 && <li>• Overall language skills</li>}
-                      {(!languageData || Object.values(languageData).every(v => v >= 70)) && 
-                        <li>• Continue current development trajectory</li>
-                      }
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Assessment Data Placeholder */}
+        {/* Assessment Data - WPM Summary and Progress Timeline */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
               <h2 className="card-title flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                Word Assessment Scores
+                Words Per Minute Summary
               </h2>
               <div className="divider"></div>
-              
-              {/* Overall Assessment Score Dial */}
-              <div className="flex justify-center mb-6">
-                <SemicircularDial
-                  value={Math.round(
-                    ((totalKeywordCounts?.scienceTalk || 0) +
-                     (totalKeywordCounts?.socialTalk || 0) +
-                     (totalKeywordCounts?.literatureTalk || 0) +
-                     (totalKeywordCounts?.languageDevelopment || 0)) / 4
-                  )}
-                  max={speedometerMax}
-                  color="text-indigo-600"
-                  label="Overall Assessment Score"
-                  description="Average words spoken across all categories"
-                  icon={Brain}
-                />
-              </div>
-              
-              <div className="divider"></div>
-              
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-semibold flex items-center gap-2">
-                      <Microscope className="w-4 h-4 text-blue-600" />
-                      Talk to support science skills
-                    </span>
-                    <span className="text-sm text-base-content/60">{totalKeywordCounts?.scienceTalk || 0}/{speedometerMax} words</span>
-                  </div>
-                  <div className="w-full bg-base-300 rounded-full h-4 overflow-hidden">
-                    <div 
-                      className="h-full bg-blue-600 transition-all duration-300 rounded-full"
-                      style={{ width: `${((totalKeywordCounts?.scienceTalk || 0) / speedometerMax) * 100}%` }}
-                    ></div>
-                  </div>
+              <div className="flex flex-col gap-4 py-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { key: 'science', label: 'Science', color: 'text-blue-600' },
+                    { key: 'social', label: 'Social', color: 'text-green-600' },
+                    { key: 'literature', label: 'Literature', color: 'text-purple-600' },
+                    { key: 'language', label: 'Language', color: 'text-orange-600' }
+                  ].map(({ key, label, color }) => {
+                    const val = averageCategoryWPM[key];
+                    return (
+                      <div key={key} className="stat bg-base-200 rounded-lg p-3">
+                        <div className={`stat-title text-xs ${color}`}>{label}</div>
+                        <div className={`stat-value text-xl ${color}`}>
+                          {val != null ? `${Math.round(val * 10) / 10}` : '—'}
+                        </div>
+                        <div className="stat-desc text-[10px]">WPM</div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-semibold flex items-center gap-2">
-                      <MessageCircle className="w-4 h-4 text-green-600" />
-                      Talk to support social emotional skills
-                    </span>
-                    <span className="text-sm text-base-content/60">{totalKeywordCounts?.socialTalk || 0}/{speedometerMax} words</span>
+                <div className="flex flex-col items-center pt-2 border-t border-base-300">
+                  <div className="text-2xl font-bold text-primary">
+                    {averageWPM != null ? `${Math.round(averageWPM * 10) / 10} WPM` : 'N/A'} <span className="text-sm font-normal text-base-content/60">(overall)</span>
                   </div>
-                  <div className="w-full bg-base-300 rounded-full h-4 overflow-hidden">
-                    <div 
-                      className="h-full bg-green-600 transition-all duration-300 rounded-full"
-                      style={{ width: `${((totalKeywordCounts?.socialTalk || 0) / speedometerMax) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-semibold flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-purple-600" />
-                      Talk to support literature skills
-                    </span>
-                    <span className="text-sm text-base-content/60">{totalKeywordCounts?.literatureTalk || 0}/{speedometerMax} words</span>
-                  </div>
-                  <div className="w-full bg-base-300 rounded-full h-4 overflow-hidden">
-                    <div 
-                      className="h-full bg-purple-600 transition-all duration-300 rounded-full"
-                      style={{ width: `${((totalKeywordCounts?.literatureTalk || 0) / speedometerMax) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-semibold flex items-center gap-2">
-                      <Brain className="w-4 h-4 text-orange-600" />
-                      Talk to support language development skills
-                    </span>
-                    <span className="text-sm text-base-content/60">{totalKeywordCounts?.languageDevelopment || 0}/{speedometerMax} words</span>
-                  </div>
-                  <div className="w-full bg-base-300 rounded-full h-4 overflow-hidden">
-                    <div 
-                      className="h-full bg-orange-600 transition-all duration-300 rounded-full"
-                      style={{ width: `${((totalKeywordCounts?.languageDevelopment || 0) / speedometerMax) * 100}%` }}
-                    ></div>
-                  </div>
+                  <p className="text-sm text-base-content/60 mt-1">
+                    {averageWPM != null
+                      ? `Average across ${allAssessments.filter((a) => a?.wordsPerMinute != null).length} recording(s)`
+                      : 'Upload recordings to see WPM (requires duration data from transcription)'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1264,17 +709,8 @@ const ChildDataPage = () => {
                 <li>
                   <div className="timeline-start">Jan 2024</div>
                   <div className="timeline-middle">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="w-5 h-5 text-primary"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                        clipRule="evenodd"
-                      />
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-primary">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                     </svg>
                   </div>
                   <div className="timeline-end timeline-box">Initial Assessment</div>
@@ -1284,17 +720,8 @@ const ChildDataPage = () => {
                   <hr className="bg-primary" />
                   <div className="timeline-start">Mar 2024</div>
                   <div className="timeline-middle">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="w-5 h-5 text-base-content/20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                        clipRule="evenodd"
-                      />
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-base-content/20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                     </svg>
                   </div>
                   <div className="timeline-end timeline-box">Mid-term Review</div>
@@ -1304,17 +731,8 @@ const ChildDataPage = () => {
                   <hr />
                   <div className="timeline-start">Jun 2024</div>
                   <div className="timeline-middle">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="w-5 h-5 text-base-content/20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                        clipRule="evenodd"
-                      />
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-base-content/20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                     </svg>
                   </div>
                   <div className="timeline-end timeline-box">Final Assessment</div>
@@ -1530,21 +948,12 @@ const ChildDataPage = () => {
                             <span>
                               {assessment.transcript.length} characters • {assessment.transcript.split(/\s+/).filter(w => w.length > 0).length} words
                             </span>
-                            {assessment.keywordCounts && (
-                              <div className="flex gap-3">
-                                <span className="badge badge-sm badge-info">
-                                  Science: {assessment.keywordCounts.science || 0}
-                                </span>
-                                <span className="badge badge-sm badge-success">
-                                  Social: {assessment.keywordCounts.social || 0}
-                                </span>
-                                <span className="badge badge-sm badge-warning">
-                                  Literature: {assessment.keywordCounts.literature || 0}
-                                </span>
-                                <span className="badge badge-sm badge-secondary">
-                                  Language: {assessment.keywordCounts.language || 0}
-                                </span>
-                              </div>
+                            {assessment.wordsPerMinute != null ? (
+                              <span className="badge badge-sm badge-primary">
+                                {Math.round(assessment.wordsPerMinute * 10) / 10} WPM
+                              </span>
+                            ) : (
+                              <span className="badge badge-sm badge-ghost">WPM: N/A</span>
                             )}
                           </div>
                         </div>
@@ -1746,24 +1155,33 @@ const ChildDataPage = () => {
               {pendingAssessment && (
                 <div className="mb-4">
                   <label className="label">
-                    <span className="label-text font-semibold">Assessment Scores</span>
+                    <span className="label-text font-semibold">Words Per Minute</span>
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="stat bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-lg p-3">
-                      <div className="stat-title text-xs text-blue-800 dark:text-blue-300">Science skills</div>
-                      <div className="stat-value text-lg text-blue-800 dark:text-blue-200">{pendingAssessment.scienceTalk || 0}%</div>
+                  <div className="stat bg-primary/10 border border-primary/30 rounded-lg p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                      {[
+                        { key: 'science', label: 'Science', color: 'text-blue-600' },
+                        { key: 'social', label: 'Social', color: 'text-green-600' },
+                        { key: 'literature', label: 'Literature', color: 'text-purple-600' },
+                        { key: 'language', label: 'Language', color: 'text-orange-600' }
+                      ].map(({ key, label, color }) => {
+                        const val = pendingAssessment.categoryWPM?.[key];
+                        return (
+                          <div key={key} className={`text-sm ${color}`}>
+                            <span className="font-medium">{label}:</span> {val != null ? `${Math.round(val * 10) / 10}` : '—'} WPM
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="stat bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg p-3">
-                      <div className="stat-title text-xs text-green-800 dark:text-green-300">Social emotional skills</div>
-                      <div className="stat-value text-lg text-green-800 dark:text-green-200">{pendingAssessment.socialTalk || 0}%</div>
+                    <div className="stat-value text-2xl text-primary">
+                      {pendingAssessment.wordsPerMinute != null
+                        ? `${Math.round((pendingAssessment.wordsPerMinute || 0) * 10) / 10} WPM`
+                        : 'N/A'} <span className="text-sm font-normal text-base-content/70">(overall)</span>
                     </div>
-                    <div className="stat bg-purple-100 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700 rounded-lg p-3">
-                      <div className="stat-title text-xs text-purple-800 dark:text-purple-300">Literature skills</div>
-                      <div className="stat-value text-lg text-purple-800 dark:text-purple-200">{pendingAssessment.literatureTalk || 0}%</div>
-                    </div>
-                    <div className="stat bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-lg p-3">
-                      <div className="stat-title text-xs text-orange-800 dark:text-orange-300">Language development skills</div>
-                      <div className="stat-value text-lg text-orange-800 dark:text-orange-200">{pendingAssessment.languageDevelopment || 0}%</div>
+                    <div className="stat-desc text-sm text-base-content/70">
+                      {pendingAssessment.wordsPerMinute != null
+                        ? `${pendingAssessment.wordCount || 0} words in ${pendingAssessment.durationSeconds ? `${Math.round(pendingAssessment.durationSeconds / 60 * 10) / 10} min` : '—'}`
+                        : 'Duration not available from transcription'}
                     </div>
                   </div>
                 </div>

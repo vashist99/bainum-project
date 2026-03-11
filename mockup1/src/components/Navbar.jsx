@@ -1,8 +1,8 @@
-import { Users, BarChart3, LogOut, Building2 } from "lucide-react";
+import { Users, BarChart3, LogOut, Building2, UserCircle } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 const Navbar = () => {
-  const { user, logout, isAdmin, isParent } = useAuth();
+  const { user, logout, isAdmin, isParent, isTeacher } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -33,6 +33,14 @@ const Navbar = () => {
             tabIndex={0}
             className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52"
           >
+            {isTeacher() && (
+              <li>
+                <a href="/profile" className="flex items-center gap-2">
+                  <UserCircle className="w-4 h-4" />
+                  My Profile
+                </a>
+              </li>
+            )}
             {isAdmin() && (
               <>
                 <li>
@@ -41,21 +49,21 @@ const Navbar = () => {
                     Centers
                   </a>
                 </li>
-              <li>
-                <a href="/teachers" className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Teachers
-                </a>
-              </li>
+                <li>
+                  <a href="/teachers" className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Teachers
+                  </a>
+                </li>
               </>
             )}
             {!isParent() && (
-            <li>
-              <a href="/data" className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-                Child Data
-              </a>
-            </li>
+              <li>
+                <a href="/data" className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  Child Data
+                </a>
+              </li>
             )}
           </ul>
         </div>
@@ -72,6 +80,14 @@ const Navbar = () => {
       
       <div className="navbar-center hidden lg:flex">
         <ul className="menu menu-horizontal px-1 gap-2">
+          {isTeacher() && (
+            <li>
+              <a href="/profile" className="btn btn-ghost flex items-center gap-2">
+                <UserCircle className="w-5 h-5" />
+                My Profile
+              </a>
+            </li>
+          )}
           {isAdmin() && (
             <>
               <li>
@@ -80,21 +96,21 @@ const Navbar = () => {
                   Centers
                 </a>
               </li>
-            <li>
-              <a href="/teachers" className="btn btn-ghost flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Teachers
-              </a>
-            </li>
+              <li>
+                <a href="/teachers" className="btn btn-ghost flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Teachers
+                </a>
+              </li>
             </>
           )}
           {!isParent() && (
-          <li>
-            <a href="/data" className="btn btn-ghost flex items-center gap-2">
-              <BarChart3 className="w-5 h-5" />
-              Child Data
-            </a>
-          </li>
+            <li>
+              <a href="/data" className="btn btn-ghost flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Child Data
+              </a>
+            </li>
           )}
         </ul>
       </div>

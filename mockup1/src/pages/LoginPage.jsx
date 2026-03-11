@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router";
 import { User } from "lucide-react";
+import toast from "react-hot-toast";
 import LoginForm from "../components/LoginForm";
 import SignupForm from "../components/SignupForm";
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("session_expired") === "1") {
+      toast.error("Your session has expired. Please log in again.");
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const toggleMode = () => {
     setIsLogin(!isLogin);

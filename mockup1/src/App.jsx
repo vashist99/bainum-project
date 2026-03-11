@@ -12,6 +12,8 @@ import EditChildForm from './pages/EditChildForm';
 import DataPage from './pages/DataPage';
 import AddDataForm from './pages/AddDataForm';
 import ChildDataPage from './pages/ChildDataPage';
+import TeacherProfilePage from './pages/TeacherProfilePage';
+import TeacherDataDetailPage from './pages/TeacherDataDetailPage';
 import ParentRegisterPage from './pages/ParentRegisterPage';
 import TeacherRegisterPage from './pages/TeacherRegisterPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -66,6 +68,16 @@ const App = () => {
       } />
       <Route path="/data/add" element={<AddDataForm />} />
       <Route path="/data/child/:childId" element={<ChildDataPage />} />
+      <Route path="/profile" element={
+        <ProtectedRoute requiredRole="teacher">
+          <TeacherProfilePage />
+        </ProtectedRoute>
+      } />
+      <Route path="/data/teacher/:teacherId" element={
+        <ProtectedRoute requiredRole="admin">
+          <TeacherDataDetailPage />
+        </ProtectedRoute>
+      } />
     </Routes>
   </div>;
 };

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
-import { Plus, Users, ChevronRight, UserPlus, Mail, Edit, Trash2 } from "lucide-react";
+import { Plus, Users, ChevronRight, UserPlus, Mail, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
@@ -25,6 +25,8 @@ const DataPage = () => {
   const [selectedChildForInvite, setSelectedChildForInvite] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [sortBy, setSortBy] = useState(null); // 'age' | 'teacher' | 'language'
+  const [sortAsc, setSortAsc] = useState(true);
 
   // Load teachers and children from database
   useEffect(() => {
@@ -156,6 +158,60 @@ const DataPage = () => {
     setShowInviteModal(true);
   };
 
+  const getAgeInMonths = (dateOfBirth) => {
+    if (!dateOfBirth) return 9999; // put missing at end when sorting
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    if (isNaN(birthDate.getTime())) return 9999;
+    let months = (today.getFullYear() - birthDate.getFullYear()) * 12 + (today.getMonth() - birthDate.getMonth());
+    if (today.getDate() < birthDate.getDate()) months -= 1;
+    return Math.max(0, months);
+  };
+
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return "—";
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    if (isNaN(birthDate.getTime())) return "—";
+    let months = (today.getFullYear() - birthDate.getFullYear()) * 12 + (today.getMonth() - birthDate.getMonth());
+    if (today.getDate() < birthDate.getDate()) months -= 1;
+    if (months < 0) return "—";
+    if (months < 12) return `${months} mo`;
+    const years = Math.floor(months / 12);
+    const rem = months % 12;
+    return rem === 0 ? `${years} yrs` : `${years} yrs ${rem} mo`;
+  };
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortBy(column);
+      setSortAsc(true);
+    }
+  };
+
+  const sortedChildren = (() => {
+    if (!sortBy) return filteredChildren;
+    return [...filteredChildren].sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'age') {
+        const ma = getAgeInMonths(a.dateOfBirth);
+        const mb = getAgeInMonths(b.dateOfBirth);
+        cmp = ma - mb;
+      } else if (sortBy === 'teacher') {
+        const ta = (a.leadTeacher || '').toLowerCase();
+        const tb = (b.leadTeacher || '').toLowerCase();
+        cmp = ta.localeCompare(tb);
+      } else if (sortBy === 'language') {
+        const la = (a.primaryLanguage || '').toLowerCase();
+        const lb = (b.primaryLanguage || '').toLowerCase();
+        cmp = la.localeCompare(lb);
+      }
+      return sortAsc ? cmp : -cmp;
+    });
+  })();
+
   const handleDeleteChild = async (childId) => {
     if (window.confirm("Are you sure you want to delete this child? This action cannot be undone.")) {
       try {
@@ -229,7 +285,7 @@ const DataPage = () => {
                   onChange={handleTeacherChange}
                   disabled={loading}
                 >
-                  <option value="">{loading ? "Loading teachers..." : "Choose a teacher..."}</option>
+                  <option value="">{loading ? "Loading teachers..." : "All teachers"}</option>
                   {teachers.map((teacher) => (
                     <option
                       key={teacher._id}
@@ -262,11 +318,36 @@ const DataPage = () => {
                     <tr>
                       <th>#</th>
                       <th>Name</th>
-                      <th>Age</th>
-                      <th>Language</th>
-                      <th>Assessment Score</th>
-                      <th>Progress</th>
-                      <th>Last Updated</th>
+                      <th>
+                        <button
+                          type="button"
+                          onClick={() => handleSort('age')}
+                          className="flex items-center gap-1 hover:underline"
+                        >
+                          Age
+                          {sortBy === 'age' ? (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
+                        </button>
+                      </th>
+                      <th>
+                        <button
+                          type="button"
+                          onClick={() => handleSort('language')}
+                          className="flex items-center gap-1 hover:underline"
+                        >
+                          Language
+                          {sortBy === 'language' ? (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
+                        </button>
+                      </th>
+                      <th>
+                        <button
+                          type="button"
+                          onClick={() => handleSort('teacher')}
+                          className="flex items-center gap-1 hover:underline"
+                        >
+                          Teacher
+                          {sortBy === 'teacher' ? (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
+                        </button>
+                      </th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -274,14 +355,14 @@ const DataPage = () => {
                     {filteredChildren.length === 0 ? (
                       <tr>
                         <td
-                          colSpan="8"
+                          colSpan="6"
                           className="text-center text-base-content/60"
                         >
                           No children found for this teacher.
                         </td>
                       </tr>
                     ) : (
-                      filteredChildren.map((child, index) => (
+                      sortedChildren.map((child, index) => (
                         <tr key={child._id || child.id} className="hover">
                           <td>{index + 1}</td>
                           <td>
@@ -293,21 +374,9 @@ const DataPage = () => {
                               <ChevronRight className="w-4 h-4" />
                             </button>
                           </td>
-                          <td>
-                            <span className="badge badge-ghost">-</span>
-                          </td>
+                          <td>{calculateAge(child.dateOfBirth)}</td>
                           <td>{child.primaryLanguage}</td>
-                          <td>
-                            <span className="badge badge-info">-</span>
-                          </td>
-                          <td>
-                            <progress
-                              className="progress progress-primary w-20"
-                              value="0"
-                              max="100"
-                            ></progress>
-                          </td>
-                          <td className="text-base-content/60">-</td>
+                          <td>{child.leadTeacher || "—"}</td>
                           <td>
                             <div className="flex gap-2">
                             <button
