@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
-import { ArrowLeft, User, Mail, Building2, FileText, Calendar, Download, Upload } from "lucide-react";
+import { ArrowLeft, User, Mail, Building2, FileText, Calendar, Download, Upload, Trash2 } from "lucide-react";
 import axios from "../lib/axios";
 import { LanguageDevelopmentCharts } from "../components/LanguageDevelopmentCharts";
 import { highlightRAGSegments, getSegmentsForHighlighting } from "../utils/ragHighlightSegments.js";
@@ -28,6 +28,23 @@ const TeacherDataDetailPage = () => {
     axios.get(`/api/assessments/teacher/${teacherId}`).then((res) => {
       setAssessments(res.data?.assessments || []);
     }).catch(() => {});
+  };
+
+  const handleDeleteTeacherAssessment = async (assessmentId) => {
+    if (!window.confirm("Are you sure you want to delete this transcript? This will remove it from the dot matrix and dials, and recalculate thresholds.")) return;
+    try {
+      await axios.delete(`/api/assessments/teacher/${assessmentId}`);
+      toast.success("Transcript deleted successfully");
+      const [assessmentsRes, cohortRes] = await Promise.all([
+        axios.get(`/api/assessments/teacher/${teacherId}`),
+        axios.get(`/api/assessments/cohort-stats/teachers`)
+      ]);
+      setAssessments(assessmentsRes.data?.assessments || []);
+      setCohortThresholdsByCategory(cohortRes.data?.cohortStats || null);
+    } catch (error) {
+      const msg = error.response?.data?.message || "Failed to delete transcript";
+      toast.error(msg);
+    }
   };
 
   useEffect(() => {
@@ -211,16 +228,25 @@ const TeacherDataDetailPage = () => {
                     return (
                       <div key={assessment._id} className="card bg-base-200 border border-base-300">
                         <div className="card-body p-4">
-                          <h3 className="font-semibold flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            {new Date(assessment.date).toLocaleDateString("en-US", {
-                              month: "long",
-                              day: "numeric",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </h3>
+                          <div className="flex justify-between items-start mb-2">
+                            <h3 className="font-semibold flex items-center gap-2">
+                              <Calendar className="w-4 h-4" />
+                              {new Date(assessment.date).toLocaleDateString("en-US", {
+                                month: "long",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </h3>
+                            <button
+                              onClick={() => handleDeleteTeacherAssessment(assessment._id)}
+                              className="btn btn-ghost btn-sm btn-circle text-error"
+                              title="Delete transcript"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                           <div className="bg-base-100 p-4 rounded-lg border border-base-300 max-h-64 overflow-y-auto mt-2">
                             {segments.length > 0 ? (
                               <>
@@ -233,18 +259,44 @@ const TeacherDataDetailPage = () => {
                               <p className="text-sm whitespace-pre-wrap leading-relaxed">{assessment.transcript}</p>
                             )}
                           </div>
-                          <div className="mt-3 flex flex-wrap gap-1 items-center">
-                            {assessment.wordsPerMinute != null ? (
-                              <span className="badge badge-sm badge-primary">
-                                {Math.round(assessment.wordsPerMinute * 10) / 10} WPM
-                              </span>
-                            ) : (
-                              <span className="badge badge-sm badge-ghost">WPM: N/A</span>
-                            )}
-                            {assessment.categoryWPM && (
-                              <span className="text-[10px] text-base-content/60 ml-1" title={`Science: ${assessment.categoryWPM.science ?? '—'} | Social: ${assessment.categoryWPM.social ?? '—'} | Literature: ${assessment.categoryWPM.literature ?? '—'} | Language: ${assessment.categoryWPM.language ?? '—'}`}>
-                                Sci {assessment.categoryWPM.science ?? '—'} · Soc {assessment.categoryWPM.social ?? '—'} · Lit {assessment.categoryWPM.literature ?? '—'} · Lang {assessment.categoryWPM.language ?? '—'}
-                              </span>
+                          <div className="mt-3 space-y-2">
+                            <div className="flex flex-wrap gap-1 items-center">
+                              {assessment.durationSeconds != null && (
+                                <span className="text-xs text-base-content/60">
+                                  {Math.floor(assessment.durationSeconds / 60)} min {Math.round(assessment.durationSeconds % 60)} sec
+                                </span>
+                              )}
+                              {assessment.wordsPerMinute != null ? (
+                                <span className="badge badge-sm badge-primary">
+                                  {Math.round(assessment.wordsPerMinute * 10) / 10} WPM
+                                </span>
+                              ) : (
+                                <span className="badge badge-sm badge-ghost">WPM: N/A</span>
+                              )}
+                              {assessment.categoryWPM && (
+                                <span className="text-[10px] text-base-content/60 ml-1" title={`Science: ${assessment.categoryWPM.science ?? '—'} | Social: ${assessment.categoryWPM.social ?? '—'} | Literature: ${assessment.categoryWPM.literature ?? '—'} | Language: ${assessment.categoryWPM.language ?? '—'}`}>
+                                  Sci {assessment.categoryWPM.science ?? '—'} · Soc {assessment.categoryWPM.social ?? '—'} · Lit {assessment.categoryWPM.literature ?? '—'} · Lang {assessment.categoryWPM.language ?? '—'}
+                                </span>
+                              )}
+                            </div>
+                            {assessment.categoryWordCount && (
+                              <div className="flex flex-wrap gap-2 text-xs">
+                                {[
+                                  { key: 'science', label: 'Science', color: 'badge-info' },
+                                  { key: 'social', label: 'Social', color: 'badge-success' },
+                                  { key: 'literature', label: 'Literature', color: 'badge-secondary' },
+                                  { key: 'language', label: 'Language', color: 'badge-warning' }
+                                ].map(({ key, label, color }) => {
+                                  const words = assessment.categoryWordCount[key] ?? 0;
+                                  const wpm = assessment.categoryWPM?.[key];
+                                  return (
+                                    <span key={key} className={`badge badge-sm ${color}`}>
+                                      {label}: {words} word{words !== 1 ? 's' : ''}
+                                      {wpm != null ? ` (${Math.round(wpm * 10) / 10} WPM)` : ''}
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             )}
                           </div>
                         </div>

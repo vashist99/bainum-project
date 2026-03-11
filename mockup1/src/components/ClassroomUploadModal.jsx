@@ -189,32 +189,48 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
           {pendingAssessment && (
             <div className="mb-4">
               <label className="label">
-                <span className="label-text font-semibold">Words Per Minute</span>
+                <span className="label-text font-semibold">Results (WPM = classified words ÷ audio length)</span>
               </label>
               <div className="stat bg-primary/10 border border-primary/30 rounded-lg p-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                <div className="mb-3 text-sm text-base-content/70">
+                  <span className="font-medium">Audio length:</span>{' '}
+                  {pendingAssessment.durationSeconds != null
+                    ? `${Math.floor(pendingAssessment.durationSeconds / 60)} min ${Math.round(pendingAssessment.durationSeconds % 60)} sec`
+                    : '—'}
+                  {pendingAssessment.wordCount != null && (
+                    <span className="ml-3">
+                      <span className="font-medium">Total words:</span> {pendingAssessment.wordCount}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                   {[
                     { key: 'science', label: 'Science', color: 'text-blue-600' },
                     { key: 'social', label: 'Social', color: 'text-green-600' },
                     { key: 'literature', label: 'Literature', color: 'text-purple-600' },
                     { key: 'language', label: 'Language', color: 'text-orange-600' }
                   ].map(({ key, label, color }) => {
-                    const val = pendingAssessment.categoryWPM?.[key];
+                    const words = pendingAssessment.categoryWordCount?.[key] ?? 0;
+                    const wpm = pendingAssessment.categoryWPM?.[key];
                     return (
-                      <div key={key} className={`text-sm ${color}`}>
-                        <span className="font-medium">{label}:</span> {val != null ? `${Math.round(val * 10) / 10}` : '—'} WPM
+                      <div key={key} className={`text-sm ${color} border border-base-300 rounded p-2`}>
+                        <div className="font-medium">{label}</div>
+                        <div>{words} word{words !== 1 ? 's' : ''}</div>
+                        <div className="text-xs opacity-80">
+                          {wpm != null ? `${Math.round(wpm * 10) / 10} WPM` : '— WPM'}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-                <div className="stat-value text-2xl text-primary">
+                <div className="stat-value text-xl text-primary border-t border-primary/20 pt-2">
                   {pendingAssessment.wordsPerMinute != null
                     ? `${Math.round((pendingAssessment.wordsPerMinute || 0) * 10) / 10} WPM`
                     : 'N/A'} <span className="text-sm font-normal text-base-content/70">(overall)</span>
                 </div>
                 <div className="stat-desc text-sm text-base-content/70">
                   {pendingAssessment.wordsPerMinute != null
-                    ? `${pendingAssessment.wordCount || 0} words • ${pendingAssessment.durationSeconds ? `${Math.round(pendingAssessment.durationSeconds / 60 * 10) / 10} min` : '—'}`
+                    ? `${pendingAssessment.wordCount || 0} words ÷ ${pendingAssessment.durationSeconds ? `${(pendingAssessment.durationSeconds / 60).toFixed(1)} min` : '—'} = overall WPM`
                     : 'Duration not available from transcription'}
                 </div>
               </div>

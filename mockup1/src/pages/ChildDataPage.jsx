@@ -366,6 +366,25 @@ const ChildDataPage = () => {
     toast.error("Transcript rejected. The assessment was not saved.");
   };
 
+  const handleDeleteChildAssessment = async (assessmentId) => {
+    if (!window.confirm("Are you sure you want to delete this transcript? This will remove it from the dot matrix and dials, and recalculate thresholds.")) return;
+    try {
+      await axios.delete(`/api/assessments/child/${assessmentId}`);
+      toast.success("Transcript deleted successfully");
+      const [assessmentsRes, latestRes] = await Promise.all([
+        axios.get(`/api/assessments/child/${childId}`),
+        axios.get(`/api/assessments/child/${childId}/latest`).catch(() => ({ data: { assessment: null } }))
+      ]);
+      setAllAssessments(assessmentsRes.data.assessments || []);
+      setLatestAssessment(latestRes.data?.assessment ?? null);
+      const cohortRes = await axios.get(`/api/assessments/cohort-stats/children`);
+      setCohortThresholdsByCategory(cohortRes.data?.cohortStats || null);
+    } catch (error) {
+      const msg = error.response?.data?.message || "Failed to delete transcript";
+      toast.error(msg);
+    }
+  };
+
   // Get language development data from latest assessment
   // Average words per minute across all assessments with duration data
   const averageWPM = useMemo(() => {
@@ -924,6 +943,13 @@ const ChildDataPage = () => {
                                 </p>
                               )}
                             </div>
+                            <button
+                              onClick={() => handleDeleteChildAssessment(assessment._id)}
+                              className="btn btn-ghost btn-sm btn-circle text-error"
+                              title="Delete transcript"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                           
                           <div className="bg-base-100 p-4 rounded-lg border border-base-300 max-h-64 overflow-y-auto">
@@ -944,16 +970,42 @@ const ChildDataPage = () => {
                             })()}
                           </div>
                           
-                          <div className="flex items-center justify-between mt-3 text-xs text-base-content/60">
-                            <span>
-                              {assessment.transcript.length} characters • {assessment.transcript.split(/\s+/).filter(w => w.length > 0).length} words
-                            </span>
-                            {assessment.wordsPerMinute != null ? (
-                              <span className="badge badge-sm badge-primary">
-                                {Math.round(assessment.wordsPerMinute * 10) / 10} WPM
+                          <div className="mt-3 space-y-2">
+                            <div className="flex items-center justify-between text-xs text-base-content/60">
+                              <span>
+                                {assessment.transcript.length} characters • {assessment.transcript.split(/\s+/).filter(w => w.length > 0).length} words
+                                {assessment.durationSeconds != null && (
+                                  <span className="ml-2">
+                                    • {Math.floor(assessment.durationSeconds / 60)} min {Math.round(assessment.durationSeconds % 60)} sec
+                                  </span>
+                                )}
                               </span>
-                            ) : (
-                              <span className="badge badge-sm badge-ghost">WPM: N/A</span>
+                              {assessment.wordsPerMinute != null ? (
+                                <span className="badge badge-sm badge-primary">
+                                  {Math.round(assessment.wordsPerMinute * 10) / 10} WPM
+                                </span>
+                              ) : (
+                                <span className="badge badge-sm badge-ghost">WPM: N/A</span>
+                              )}
+                            </div>
+                            {assessment.categoryWordCount && (
+                              <div className="flex flex-wrap gap-2 text-xs">
+                                {[
+                                  { key: 'science', label: 'Science', color: 'badge-info' },
+                                  { key: 'social', label: 'Social', color: 'badge-success' },
+                                  { key: 'literature', label: 'Literature', color: 'badge-secondary' },
+                                  { key: 'language', label: 'Language', color: 'badge-warning' }
+                                ].map(({ key, label, color }) => {
+                                  const words = assessment.categoryWordCount[key] ?? 0;
+                                  const wpm = assessment.categoryWPM?.[key];
+                                  return (
+                                    <span key={key} className={`badge badge-sm ${color}`}>
+                                      {label}: {words} word{words !== 1 ? 's' : ''}
+                                      {wpm != null ? ` (${Math.round(wpm * 10) / 10} WPM)` : ''}
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1155,32 +1207,48 @@ const ChildDataPage = () => {
               {pendingAssessment && (
                 <div className="mb-4">
                   <label className="label">
-                    <span className="label-text font-semibold">Words Per Minute</span>
+                    <span className="label-text font-semibold">Results (WPM = classified words ÷ audio length)</span>
                   </label>
                   <div className="stat bg-primary/10 border border-primary/30 rounded-lg p-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                    <div className="mb-3 text-sm text-base-content/70">
+                      <span className="font-medium">Audio length:</span>{' '}
+                      {pendingAssessment.durationSeconds != null
+                        ? `${Math.floor(pendingAssessment.durationSeconds / 60)} min ${Math.round(pendingAssessment.durationSeconds % 60)} sec`
+                        : '—'}
+                      {pendingAssessment.wordCount != null && (
+                        <span className="ml-3">
+                          <span className="font-medium">Total words:</span> {pendingAssessment.wordCount}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                       {[
                         { key: 'science', label: 'Science', color: 'text-blue-600' },
                         { key: 'social', label: 'Social', color: 'text-green-600' },
                         { key: 'literature', label: 'Literature', color: 'text-purple-600' },
                         { key: 'language', label: 'Language', color: 'text-orange-600' }
                       ].map(({ key, label, color }) => {
-                        const val = pendingAssessment.categoryWPM?.[key];
+                        const words = pendingAssessment.categoryWordCount?.[key] ?? 0;
+                        const wpm = pendingAssessment.categoryWPM?.[key];
                         return (
-                          <div key={key} className={`text-sm ${color}`}>
-                            <span className="font-medium">{label}:</span> {val != null ? `${Math.round(val * 10) / 10}` : '—'} WPM
+                          <div key={key} className={`text-sm ${color} border border-base-300 rounded p-2`}>
+                            <div className="font-medium">{label}</div>
+                            <div>{words} word{words !== 1 ? 's' : ''}</div>
+                            <div className="text-xs opacity-80">
+                              {wpm != null ? `${Math.round(wpm * 10) / 10} WPM` : '— WPM'}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                    <div className="stat-value text-2xl text-primary">
+                    <div className="stat-value text-xl text-primary border-t border-primary/20 pt-2">
                       {pendingAssessment.wordsPerMinute != null
                         ? `${Math.round((pendingAssessment.wordsPerMinute || 0) * 10) / 10} WPM`
                         : 'N/A'} <span className="text-sm font-normal text-base-content/70">(overall)</span>
                     </div>
                     <div className="stat-desc text-sm text-base-content/70">
                       {pendingAssessment.wordsPerMinute != null
-                        ? `${pendingAssessment.wordCount || 0} words in ${pendingAssessment.durationSeconds ? `${Math.round(pendingAssessment.durationSeconds / 60 * 10) / 10} min` : '—'}`
+                        ? `${pendingAssessment.wordCount || 0} words ÷ ${pendingAssessment.durationSeconds ? `${(pendingAssessment.durationSeconds / 60).toFixed(1)} min` : '—'} = overall WPM`
                         : 'Duration not available from transcription'}
                     </div>
                   </div>
