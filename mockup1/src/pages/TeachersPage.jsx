@@ -258,12 +258,12 @@ const TeachersPage = () => {
     <div className="min-h-screen bg-base-200">
       <Navbar />
 
-      <div className="container mx-auto p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+      <div className="container mx-auto p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Teachers
           </h1>
-          <div className="flex gap-3">
+          <div className="flex gap-2 flex-shrink-0">
             <button
               onClick={() => navigate("/teachers/add")}
               className="btn btn-primary gap-2"
@@ -309,7 +309,105 @@ const TeachersPage = () => {
                 <span className="loading loading-spinner loading-lg"></span>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              {/* Mobile: Card layout */}
+              <div className="block md:hidden space-y-3">
+                {filteredTeachers.length === 0 ? (
+                  <p className="text-center text-base-content/60 py-8">
+                    {selectedCenter
+                      ? `No teachers found at ${selectedCenter}.`
+                      : "No teachers added yet. Click \"Add Teacher\" to get started."}
+                  </p>
+                ) : (
+                  filteredTeachers.map((teacher, index) => {
+                    const isExpanded = expandedTeachers.has(teacher._id);
+                    const teacherChildren = getChildrenForTeacher(teacher.name);
+                    const hasChildren = teacherChildren.length > 0;
+                    return (
+                      <div key={teacher._id} className="card bg-base-200 border border-base-300 overflow-hidden">
+                        <div
+                          className="card-body p-4"
+                          onClick={() => isAdmin() && toggleTeacherExpansion(teacher._id)}
+                          role={isAdmin() ? "button" : undefined}
+                          tabIndex={isAdmin() ? 0 : undefined}
+                          onKeyDown={(e) => isAdmin() && (e.key === "Enter" || e.key === " ") && toggleTeacherExpansion(teacher._id)}
+                        >
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {isAdmin() && hasChildren && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); toggleTeacherExpansion(teacher._id); }}
+                                    className="btn btn-ghost btn-xs btn-circle flex-shrink-0"
+                                  >
+                                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                  </button>
+                                )}
+                                <h3 className="font-semibold text-base flex items-center gap-1">
+                                  <span className="text-base-content/60">#{index + 1}</span>
+                                  {isAdmin() ? (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); navigate(`/teachers/${teacher.username || teacher._id}`); }}
+                                      className="link link-primary hover:underline"
+                                    >
+                                      {teacher.name}
+                                    </button>
+                                  ) : (
+                                    <span>{teacher.name}</span>
+                                  )}
+                                  {hasChildren && <span className="badge badge-sm badge-secondary">{teacherChildren.length}</span>}
+                                </h3>
+                              </div>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-sm text-base-content/70">
+                                <span className="truncate">{teacher.email}</span>
+                                <span>{teacher.center}</span>
+                              </div>
+                              <div className="text-xs text-base-content/60 mt-1">
+                                {teacher.education} • DOB: {teacher.dateOfBirth ? new Date(teacher.dateOfBirth).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-1 justify-end flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <button onClick={() => openInviteModal(teacher)} className="btn btn-primary btn-xs gap-1">
+                                <Mail className="w-3 h-3" /> Invite
+                              </button>
+                              <button onClick={() => navigate(`/teachers/edit/${teacher._id}`)} className="btn btn-ghost btn-xs">
+                                <Edit className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => handleDelete(teacher._id)} className="btn btn-ghost btn-xs text-error">
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                          {isAdmin() && isExpanded && (
+                            <div className="mt-3 pt-3 border-t border-base-300 space-y-2">
+                              <h4 className="font-semibold text-sm text-base-content/70">Children ({teacherChildren.length})</h4>
+                              {teacherChildren.length > 0 ? (
+                                teacherChildren.map((child) => (
+                                  <div
+                                    key={child._id}
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/data/child/${child._id}`); }}
+                                    className="flex items-center justify-between p-2 rounded-lg bg-base-100 hover:bg-base-300 cursor-pointer"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <User className="w-4 h-4 text-primary" />
+                                      <span className="font-medium text-sm">{child.name}</span>
+                                    </div>
+                                    <ChevronRight className="w-4 h-4 text-base-content/60" />
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="text-sm text-base-content/60">No children assigned.</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {/* Desktop: Table layout */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="table table-zebra">
                   <thead>
                     <tr>
@@ -389,14 +487,14 @@ const TeachersPage = () => {
                                 </button>
                               </td>
                             )}
-                            <td>{index + 1}</td>
-                            <td>
+                            <td className="align-middle">{index + 1}</td>
+                            <td className="align-middle pl-3">
                               <div className="flex items-center gap-2">
                                 {isAdmin() ? (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      navigate(`/data/teacher/${teacher._id}`);
+                                      navigate(`/teachers/${teacher.username || teacher._id}`);
                                     }}
                                     className="link link-primary font-semibold hover:underline inline-flex items-center gap-1"
                                     title="View classroom talk data"
@@ -425,16 +523,16 @@ const TeachersPage = () => {
                                 </button>
                               </div>
                             </td>
-                            <td>{teacher.email}</td>
-                            <td>{teacher.education}</td>
-                            <td>{teacher.dateOfBirth ? new Date(teacher.dateOfBirth).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
-                            <td>
-                              <span className="badge badge-primary">
+                            <td className="align-middle">{teacher.email}</td>
+                            <td className="align-middle">{teacher.education}</td>
+                            <td className="align-middle">{teacher.dateOfBirth ? new Date(teacher.dateOfBirth).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
+                            <td className="align-middle">
+                              <span className="badge badge-primary inline-flex items-center justify-center whitespace-nowrap">
                                 {teacher.center}
                               </span>
                             </td>
-                            <td>{getPrimaryLanguageForTeacher(teacher.name) || "—"}</td>
-                            <td onClick={(e) => e.stopPropagation()}>
+                            <td className="align-middle">{getPrimaryLanguageForTeacher(teacher.name) || "—"}</td>
+                            <td className="align-middle" onClick={(e) => e.stopPropagation()}>
                               <div className="flex gap-2">
                                 <button 
                                   onClick={() => navigate(`/teachers/edit/${teacher._id}`)}
@@ -522,6 +620,7 @@ const TeachersPage = () => {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </div>
         </div>
@@ -530,7 +629,7 @@ const TeachersPage = () => {
       {/* Invite Teacher Modal */}
       {showInviteModal && selectedTeacherForInvite && (
         <div className="modal modal-open">
-          <div className="modal-box">
+          <div className="modal-box w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
               <Mail className="w-6 h-6 text-primary" />
               Send Teacher Invitation

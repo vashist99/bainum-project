@@ -13,6 +13,7 @@ const AddTeacherForm = () => {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
+    username: "",
     email: "",
     education: "",
     dateOfBirth: "",
@@ -48,12 +49,27 @@ const AddTeacherForm = () => {
     if (
       !formData.firstName ||
       !formData.lastName ||
+      !formData.username ||
       !formData.email ||
       !formData.education ||
       !formData.dateOfBirth ||
       !formData.center
     ) {
       toast.error("Please fill in all fields");
+      return false;
+    }
+    if (!/^[a-z0-9_]{3,30}$/.test(formData.username.toLowerCase().trim())) {
+      toast.error("Username must be 3-30 chars: lowercase letters, numbers, underscore only");
+      return false;
+    }
+
+    // Teacher must be 21 or older
+    const birthDate = new Date(formData.dateOfBirth);
+    const today = new Date();
+    const minBirthDate = new Date(today);
+    minBirthDate.setFullYear(today.getFullYear() - 21);
+    if (birthDate > minBirthDate) {
+      toast.error("Teacher must be 21 years or older");
       return false;
     }
 
@@ -78,6 +94,7 @@ const AddTeacherForm = () => {
       // Prepare data for backend
       const teacherData = {
         name: `${formData.firstName} ${formData.lastName}`,
+        username: formData.username.toLowerCase().trim(),
         email: formData.email,
         center: formData.center,
         education: formData.education,
@@ -105,7 +122,7 @@ const AddTeacherForm = () => {
     <div className="min-h-screen bg-base-200">
       <Navbar />
 
-      <div className="container mx-auto p-6 max-w-2xl">
+      <div className="container mx-auto p-4 md:p-6 max-w-2xl">
         <div className="flex items-center gap-4 mb-6">
           <button
             onClick={() => navigate("/teachers")}
@@ -151,6 +168,22 @@ const AddTeacherForm = () => {
                 />
               </div>
 
+              {/* Username */}
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text font-semibold">Username</span>
+                  <span className="label-text-alt">3-30 chars, letters, numbers, underscore</span>
+                </label>
+                <input
+                  type="text"
+                  name="username"
+                  placeholder="e.g. johndoe"
+                  className="input input-bordered input-primary w-full"
+                  value={formData.username}
+                  onChange={handleInputChange}
+                />
+              </div>
+
               {/* Email */}
               <div className="form-control">
                 <label className="label">
@@ -185,6 +218,7 @@ const AddTeacherForm = () => {
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">Date of Birth</span>
+                  <span className="label-text-alt">Must be 21 or older</span>
                 </label>
                 <input
                   type="date"
@@ -192,6 +226,11 @@ const AddTeacherForm = () => {
                   className="input input-bordered input-primary w-full"
                   value={formData.dateOfBirth}
                   onChange={handleInputChange}
+                  max={(() => {
+                    const d = new Date();
+                    d.setFullYear(d.getFullYear() - 21);
+                    return d.toISOString().split("T")[0];
+                  })()}
                 />
               </div>
 

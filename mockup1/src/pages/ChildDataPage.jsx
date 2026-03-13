@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
 import { ArrowLeft, User, Calendar, Languages, Stethoscope, Users, FileText, BookOpen, MessageCircle, Microscope, Brain, Plus, Trash2, Upload, Mic, Check, X, Download } from "lucide-react";
@@ -66,6 +66,7 @@ const ChildDataPage = () => {
   const [loadingTeachers, setLoadingTeachers] = useState(false);
   const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
   const [cohortThresholdsByCategory, setCohortThresholdsByCategory] = useState(null);
+  const abortControllerRef = useRef(null);
 
   // Rotate processing messages while audio is uploading
   useEffect(() => {
@@ -269,6 +270,13 @@ const ChildDataPage = () => {
     }
   };
 
+  const handleCancelProcessing = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
   const handleUploadAudio = async () => {
     if (!audioFile) {
       toast.error("Please select an audio file");
@@ -281,6 +289,7 @@ const ChildDataPage = () => {
     }
 
     setUploading(true);
+    abortControllerRef.current = new AbortController();
 
     try {
       const formData = new FormData();
@@ -293,6 +302,7 @@ const ChildDataPage = () => {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        signal: abortControllerRef.current.signal,
       });
 
 
@@ -314,11 +324,16 @@ const ChildDataPage = () => {
         setUploading(false);
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message || "Failed to process audio";
-      toast.error(errorMessage);
-      console.error("Error uploading audio:", error);
+      if (axios.isCancel?.(error) || error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+        toast.success("Processing cancelled");
+      } else {
+        const errorMessage = error.response?.data?.message || "Failed to process audio";
+        toast.error(errorMessage);
+        console.error("Error uploading audio:", error);
+      }
     } finally {
       setUploading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -461,23 +476,23 @@ const ChildDataPage = () => {
     <div className="min-h-screen bg-base-200">
       <Navbar />
 
-      <div className="container mx-auto p-6 max-w-6xl">
+      <div className="container mx-auto p-4 md:p-6 max-w-6xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             {user?.role !== 'parent' && (
             <button
               onClick={() => navigate("/data")}
-              className="btn btn-ghost btn-circle"
+              className="btn btn-ghost btn-circle flex-shrink-0"
             >
-              <ArrowLeft className="w-6 h-6" />
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
             )}
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent truncate">
               {child?.name || 'Child'}'s Data
             </h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {/* View Mode Dropdown */}
             <div className="form-control">
               <select
@@ -1020,7 +1035,7 @@ const ChildDataPage = () => {
         {/* Upload Recording Modal */}
         {showUploadModal && (
           <div className="modal modal-open">
-            <div className="modal-box max-w-2xl">
+            <div className="modal-box max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
                 <Mic className="w-6 h-6 text-primary" />
                 Upload Audio Recording
@@ -1088,7 +1103,9 @@ const ChildDataPage = () => {
                   value={recordingDate}
                   onChange={(e) => setRecordingDate(e.target.value)}
                   className="input input-bordered input-primary w-full"
-                  max={new Date().toISOString().split('T')[0]} // Can't select future dates
+                  min={`${new Date().getFullYear()}-01-01`}
+                  max={new Date().toISOString().split('T')[0]}
+                  title="Recording date must be in the current year, up to today"
                 />
               </div>
 
@@ -1128,14 +1145,17 @@ const ChildDataPage = () => {
               <div className="modal-action">
                 <button
                   onClick={() => {
-                    setShowUploadModal(false);
-                    setAudioFile(null);
-                    setRecordingDate(new Date().toISOString().split('T')[0]); // Reset to today
+                    if (uploading) {
+                      handleCancelProcessing();
+                    } else {
+                      setShowUploadModal(false);
+                      setAudioFile(null);
+                      setRecordingDate(new Date().toISOString().split('T')[0]);
+                    }
                   }}
                   className="btn btn-ghost"
-                  disabled={uploading}
                 >
-                  Cancel
+                  {uploading ? "Cancel Processing" : "Cancel"}
                 </button>
                 <button
                   onClick={handleUploadAudio}
@@ -1164,7 +1184,7 @@ const ChildDataPage = () => {
         {showTranscriptModal && pendingTranscript && (
           <div className="modal modal-open">
             <div className="modal-backdrop bg-black/50" onClick={handleRejectTranscript} aria-hidden="true"></div>
-            <div className="modal-box max-w-3xl relative z-[100] bg-base-100">
+            <div className="modal-box max-w-3xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto relative z-[100] bg-base-100">
               <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
                 <FileText className="w-6 h-6 text-primary" />
                 Review Transcript

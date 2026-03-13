@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Mic, Upload, Calendar, FileText, Check, X } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
@@ -31,6 +31,7 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
   const [showTranscriptModal, setShowTranscriptModal] = useState(false);
   const [pendingTranscript, setPendingTranscript] = useState(null);
   const [pendingAssessment, setPendingAssessment] = useState(null);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     if (isAdmin && !isTeacherPreselected) {
@@ -77,6 +78,13 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
     }
   };
 
+  const handleCancelProcessing = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
   const handleUpload = async () => {
     if (!audioFile) {
       toast.error("Please select an audio file");
@@ -88,6 +96,7 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
     }
 
     setUploading(true);
+    abortControllerRef.current = new AbortController();
     try {
       const formData = new FormData();
       formData.append("audio", audioFile);
@@ -101,6 +110,7 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
 
       const response = await axios.post("/api/whisper/classroom", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        signal: abortControllerRef.current.signal,
       });
 
       if (response.data.transcript !== undefined && response.data.assessment) {
@@ -115,10 +125,15 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
         toast.error("No transcript received from server");
       }
     } catch (error) {
-      const msg = error.response?.data?.message || "Failed to process audio";
-      toast.error(msg);
+      if (axios.isCancel?.(error) || error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
+        toast.success("Processing cancelled");
+      } else {
+        const msg = error.response?.data?.message || "Failed to process audio";
+        toast.error(msg);
+      }
     } finally {
       setUploading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -163,7 +178,7 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
     return (
       <div className="modal modal-open">
         <div className="modal-backdrop bg-black/50" onClick={handleReject} aria-hidden="true" />
-        <div className="modal-box max-w-3xl relative z-[100] bg-base-100">
+        <div className="modal-box max-w-3xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto relative z-[100] bg-base-100">
           <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
             <FileText className="w-6 h-6 text-primary" />
             Review Transcript
@@ -256,7 +271,7 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
 
   return (
     <div className="modal modal-open">
-      <div className="modal-box max-w-2xl">
+      <div className="modal-box max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
         <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
           <Mic className="w-6 h-6 text-primary" />
           Upload Classroom Recording
@@ -336,7 +351,9 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
             value={recordingDate}
             onChange={(e) => setRecordingDate(e.target.value)}
             className="input input-bordered input-primary w-full"
+            min={`${new Date().getFullYear()}-01-01`}
             max={new Date().toISOString().split("T")[0]}
+            title="Recording date must be in the current year, up to today"
           />
         </div>
 
@@ -356,8 +373,11 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
         )}
 
         <div className="modal-action">
-          <button onClick={handleClose} className="btn btn-ghost" disabled={uploading}>
-            Cancel
+          <button
+            onClick={() => (uploading ? handleCancelProcessing() : handleClose())}
+            className="btn btn-ghost"
+          >
+            {uploading ? "Cancel Processing" : "Cancel"}
           </button>
           <button
             onClick={handleUpload}

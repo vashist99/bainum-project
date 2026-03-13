@@ -99,6 +99,16 @@ const EditChildForm = () => {
       return false;
     }
 
+    // Child must be 8 years or younger
+    const birthDate = new Date(formData.dateOfBirth);
+    const today = new Date();
+    const maxBirthDate = new Date(today);
+    maxBirthDate.setFullYear(today.getFullYear() - 8);
+    if (birthDate < maxBirthDate) {
+      toast.error("Child must be 8 years or younger");
+      return false;
+    }
+
     return true;
   };
 
@@ -174,7 +184,7 @@ const EditChildForm = () => {
     return (
       <div className="min-h-screen bg-base-200">
         <Navbar />
-        <div className="container mx-auto p-6 max-w-2xl">
+        <div className="container mx-auto p-4 md:p-6 max-w-2xl">
           <div className="flex justify-center items-center h-64">
             <span className="loading loading-spinner loading-lg"></span>
           </div>
@@ -187,7 +197,7 @@ const EditChildForm = () => {
     <div className="min-h-screen bg-base-200">
       <Navbar />
 
-      <div className="container mx-auto p-6 max-w-2xl">
+      <div className="container mx-auto p-4 md:p-6 max-w-2xl">
         <div className="flex items-center gap-4 mb-6">
           <button
             onClick={() => navigate("/data")}
@@ -237,6 +247,7 @@ const EditChildForm = () => {
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">Date of Birth</span>
+                  <span className="label-text-alt">Must be 8 years or younger</span>
                 </label>
                 <input
                   type="date"
@@ -244,6 +255,12 @@ const EditChildForm = () => {
                   className="input input-bordered input-primary w-full"
                   value={formData.dateOfBirth}
                   onChange={handleInputChange}
+                  min={(() => {
+                    const d = new Date();
+                    d.setFullYear(d.getFullYear() - 8);
+                    return d.toISOString().split("T")[0];
+                  })()}
+                  max={new Date().toISOString().split("T")[0]}
                 />
               </div>
 

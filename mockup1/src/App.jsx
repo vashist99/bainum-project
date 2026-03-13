@@ -16,6 +16,8 @@ import TeacherProfilePage from './pages/TeacherProfilePage';
 import TeacherDataDetailPage from './pages/TeacherDataDetailPage';
 import ParentRegisterPage from './pages/ParentRegisterPage';
 import TeacherRegisterPage from './pages/TeacherRegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App = () => {
@@ -24,6 +26,8 @@ const App = () => {
       <Route path="/" element={<LoginPage />} />
       <Route path="/parent/register" element={<ParentRegisterPage />} />
       <Route path="/teacher/register" element={<TeacherRegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/home" element={
         <ProtectedRoute>
           <HomePage />
@@ -73,8 +77,8 @@ const App = () => {
           <TeacherProfilePage />
         </ProtectedRoute>
       } />
-      <Route path="/data/teacher/:teacherId" element={
-        <ProtectedRoute requiredRole="admin">
+      <Route path="/teachers/:username" element={
+        <ProtectedRoute excludeRoles={['parent']}>
           <TeacherDataDetailPage />
         </ProtectedRoute>
       } />

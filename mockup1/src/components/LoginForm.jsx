@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { Mail, Lock, Eye, EyeOff, Shield } from "lucide-react";
@@ -115,6 +115,7 @@ const LoginForm = () => {
             onChange={handleInputChange}
           >
             <option value="">Auto-detect (Parent/Teacher/Admin)</option>
+            <option value="parent">Parent</option>
             <option value="teacher">Teacher</option>
             <option value="admin">Administrator</option>
           </select>
@@ -154,9 +155,9 @@ const LoginForm = () => {
 
       {/* Forgot Password Link */}
       <div className="text-right">
-        <a href="#" className="label-text-alt link link-hover text-primary font-semibold">
+        <Link to="/forgot-password" className="label-text-alt link link-hover text-primary font-semibold">
           Forgot password?
-        </a>
+        </Link>
       </div>
 
       {/* Submit Button */}

@@ -10,6 +10,7 @@ const SignupForm = () => {
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
+    username: "",
     email: "",
     password: "",
     name: "",
@@ -26,8 +27,12 @@ const SignupForm = () => {
   };
 
   const validateForm = () => {
-    if (!formData.email || !formData.password || !formData.name || !formData.role) {
+    if (!formData.username || !formData.email || !formData.password || !formData.name || !formData.role) {
       toast.error("Please fill in all fields");
+      return false;
+    }
+    if (!/^[a-z0-9_]{3,30}$/.test(formData.username.toLowerCase().trim())) {
+      toast.error("Username must be 3-30 chars: lowercase letters, numbers, underscore only");
       return false;
     }
 
@@ -61,6 +66,7 @@ const SignupForm = () => {
     try {
       const response = await axios.post("/api/auth/register", {
         name: formData.name,
+        username: formData.username.toLowerCase().trim(),
         email: formData.email,
         password: formData.password,
         role: formData.role,
@@ -76,6 +82,7 @@ const SignupForm = () => {
 
       // Reset form
       setFormData({
+        username: "",
         email: "",
         password: "",
         name: "",
@@ -114,6 +121,27 @@ const SignupForm = () => {
         </div>
       </div>
 
+      {/* Username Field */}
+      <div className="form-control">
+        <label className="label">
+          <span className="label-text font-semibold">Username</span>
+          <span className="label-text-alt">3-30 chars, lowercase, numbers, underscore</span>
+        </label>
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <User className="h-5 w-5 text-primary/60" />
+          </div>
+          <input
+            type="text"
+            name="username"
+            placeholder="johndoe"
+            className="input input-bordered input-primary w-full pl-10 focus:input-primary transition-all duration-200"
+            value={formData.username}
+            onChange={handleInputChange}
+          />
+        </div>
+      </div>
+
       {/* Role Field */}
       <div className="form-control">
         <label className="label">
@@ -132,8 +160,15 @@ const SignupForm = () => {
             <option value="">Select your role</option>
             <option value="teacher">Teacher</option>
             <option value="admin">Administrator</option>
+            <option value="parent">Parent</option>
           </select>
         </div>
+        {formData.role === "parent" && (
+          <p className="text-sm text-primary mt-2">
+            Parents register through an invitation link from their child&apos;s teacher. If you have an invitation,{" "}
+            <a href="/parent/register" className="link link-hover font-semibold">use it here</a>.
+          </p>
+        )}
       </div>
 
       {/* Email Field */}

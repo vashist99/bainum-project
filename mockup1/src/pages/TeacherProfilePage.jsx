@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Navigate } from "react-router";
 import Navbar from "../components/Navbar";
 import { User, Mail, Building2, Mic, FileText, Calendar, Download, Trash2 } from "lucide-react";
 import axios from "../lib/axios";
@@ -11,6 +12,7 @@ import ClassroomUploadModal from "../components/ClassroomUploadModal";
 
 const TeacherProfilePage = () => {
   const { user } = useAuth();
+  if (user?.username) return <Navigate to={`/teachers/${user.username}`} replace />;
   const [teacher, setTeacher] = useState(null);
   const [assessments, setAssessments] = useState([]);
   const [loading, setLoading] = useState(true);

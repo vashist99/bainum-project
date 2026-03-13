@@ -11,7 +11,8 @@ import { useAuth } from "../contexts/AuthContext";
 import ClassroomUploadModal from "../components/ClassroomUploadModal";
 
 const TeacherDataDetailPage = () => {
-  const { teacherId } = useParams();
+  const { username: usernameOrId } = useParams();
+  const teacherId = usernameOrId;
   const navigate = useNavigate();
   const { user, isAdmin, isTeacher } = useAuth();
   const [teacher, setTeacher] = useState(null);
@@ -21,13 +22,15 @@ const TeacherDataDetailPage = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [cohortThresholdsByCategory, setCohortThresholdsByCategory] = useState(null);
 
-  const isViewingOwnPage = isTeacher() && (user?.id === teacherId || String(user?.id) === String(teacherId));
+  const isViewingOwnPage = isTeacher() && teacher && (String(user?.id) === String(teacher._id) || user?.username === (teacher.username || ''));
 
   const handleUploadSuccess = () => {
     setShowUploadModal(false);
-    axios.get(`/api/assessments/teacher/${teacherId}`).then((res) => {
-      setAssessments(res.data?.assessments || []);
-    }).catch(() => {});
+    if (teacher?._id) {
+      axios.get(`/api/assessments/teacher/${teacher._id}`).then((res) => {
+        setAssessments(res.data?.assessments || []);
+      }).catch(() => {});
+    }
   };
 
   const handleDeleteTeacherAssessment = async (assessmentId) => {
@@ -35,8 +38,9 @@ const TeacherDataDetailPage = () => {
     try {
       await axios.delete(`/api/assessments/teacher/${assessmentId}`);
       toast.success("Transcript deleted successfully");
+      if (!teacher?._id) return;
       const [assessmentsRes, cohortRes] = await Promise.all([
-        axios.get(`/api/assessments/teacher/${teacherId}`),
+        axios.get(`/api/assessments/teacher/${teacher._id}`),
         axios.get(`/api/assessments/cohort-stats/teachers`)
       ]);
       setAssessments(assessmentsRes.data?.assessments || []);
@@ -52,14 +56,17 @@ const TeacherDataDetailPage = () => {
       if (!teacherId) return;
       try {
         setLoading(true);
-        const [teacherRes, assessmentsRes, cohortRes] = await Promise.all([
-          axios.get(`/api/teachers/${teacherId}`).catch(() => ({ data: { teacher: null } })),
-          axios.get(`/api/assessments/teacher/${teacherId}`).catch(() => ({ data: { assessments: [] } })),
-          axios.get(`/api/assessments/cohort-stats/teachers`).catch(() => ({ data: { cohortStats: null } })),
-        ]);
-        setTeacher(teacherRes.data?.teacher || null);
-        setAssessments(assessmentsRes.data?.assessments || []);
-        setCohortThresholdsByCategory(cohortRes.data?.cohortStats || null);
+        const teacherRes = await axios.get(`/api/teachers/${teacherId}`).catch(() => ({ data: { teacher: null } }));
+        const teacher = teacherRes.data?.teacher || null;
+        setTeacher(teacher);
+        if (teacher) {
+          const [assessmentsRes, cohortRes] = await Promise.all([
+            axios.get(`/api/assessments/teacher/${teacher._id}`).catch(() => ({ data: { assessments: [] } })),
+            axios.get(`/api/assessments/cohort-stats/teachers`).catch(() => ({ data: { cohortStats: null } })),
+          ]);
+          setAssessments(assessmentsRes.data?.assessments || []);
+          setCohortThresholdsByCategory(cohortRes.data?.cohortStats || null);
+        }
       } catch (error) {
         console.error("Error fetching teacher data:", error);
         toast.error("Failed to load teacher data");

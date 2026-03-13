@@ -231,7 +231,7 @@ const DataPage = () => {
     <div className="min-h-screen bg-base-200">
       <Navbar />
 
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 md:p-6">
         {/* DEBUG INFO - REMOVE LATER */}
         {/* <div className="alert alert-warning mb-4">
           <div>
@@ -244,11 +244,11 @@ const DataPage = () => {
           </div>
         </div> */}
 
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Data
           </h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-shrink-0">
             <button
               onClick={() => navigate("/children/add")}
               className="btn btn-primary gap-2"
@@ -312,7 +312,72 @@ const DataPage = () => {
               <h2 className="card-title mb-4">
                 {selectedTeacher ? `Children under ${selectedTeacher}` : "All Children"}
               </h2>
-              <div className="overflow-x-auto">
+              {/* Mobile: Card layout */}
+              <div className="block md:hidden space-y-3">
+                {filteredChildren.length === 0 ? (
+                  <p className="text-center text-base-content/60 py-8">
+                    No children found for this teacher.
+                  </p>
+                ) : (
+                  sortedChildren.map((child, index) => (
+                    <div
+                      key={child._id || child.id}
+                      className="card bg-base-200 border border-base-300 overflow-hidden"
+                    >
+                      <div className="card-body p-4">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <h3 className="font-semibold text-base flex items-center gap-1">
+                              <span className="text-base-content/60">#{index + 1}</span>
+                              <button
+                                onClick={() => navigate(`/data/child/${child._id || child.id}`)}
+                                className="link link-primary hover:underline"
+                              >
+                                {child.name}
+                              </button>
+                              <ChevronRight className="w-4 h-4 flex-shrink-0" />
+                            </h3>
+                            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-sm text-base-content/70">
+                              <span>Age: {calculateAge(child.dateOfBirth)}</span>
+                              <span>Lang: {child.primaryLanguage}</span>
+                              <span>Teacher: {child.leadTeacher || "—"}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1 justify-end">
+                            <button
+                              onClick={() => navigate(`/data/child/${child._id || child.id}`)}
+                              className="btn btn-ghost btn-xs"
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={() => navigate(`/children/edit/${child._id || child.id}`)}
+                              className="btn btn-ghost btn-xs"
+                            >
+                              <Edit className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteChild(child._id || child.id)}
+                              className="btn btn-ghost btn-xs text-error"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => openInviteModal(child)}
+                              className="btn btn-primary btn-xs gap-1"
+                            >
+                              <Mail className="w-3 h-3" />
+                              Invite
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {/* Desktop: Table layout */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="table table-zebra">
                   <thead>
                     <tr>
@@ -364,8 +429,8 @@ const DataPage = () => {
                     ) : (
                       sortedChildren.map((child, index) => (
                         <tr key={child._id || child.id} className="hover">
-                          <td>{index + 1}</td>
-                          <td>
+                          <td className="align-middle">{index + 1}</td>
+                          <td className="align-middle">
                             <button
                               onClick={() => navigate(`/data/child/${child._id || child.id}`)}
                               className="link link-primary font-semibold hover:scale-105 transition-transform inline-flex items-center gap-1"
@@ -374,10 +439,10 @@ const DataPage = () => {
                               <ChevronRight className="w-4 h-4" />
                             </button>
                           </td>
-                          <td>{calculateAge(child.dateOfBirth)}</td>
-                          <td>{child.primaryLanguage}</td>
-                          <td>{child.leadTeacher || "—"}</td>
-                          <td>
+                          <td className="align-middle">{calculateAge(child.dateOfBirth)}</td>
+                          <td className="align-middle">{child.primaryLanguage}</td>
+                          <td className="align-middle">{child.leadTeacher || "—"}</td>
+                          <td className="align-middle">
                             <div className="flex gap-2">
                             <button
                                 onClick={() => navigate(`/data/child/${child._id || child.id}`)}
@@ -441,7 +506,7 @@ const DataPage = () => {
         {/* Invitation Modal */}
         {showInviteModal && selectedChildForInvite && (
           <div className="modal modal-open">
-            <div className="modal-box">
+            <div className="modal-box w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
               <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
                 <Mail className="w-6 h-6 text-primary" />
                 Send Parent Invitation

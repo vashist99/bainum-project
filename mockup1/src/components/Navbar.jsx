@@ -35,7 +35,7 @@ const Navbar = () => {
           >
             {isTeacher() && (
               <li>
-                <a href="/profile" className="flex items-center gap-2">
+                <a href={user?.username ? `/teachers/${user.username}` : "/profile"} className="flex items-center gap-2">
                   <UserCircle className="w-4 h-4" />
                   My Profile
                 </a>
@@ -82,7 +82,7 @@ const Navbar = () => {
         <ul className="menu menu-horizontal px-1 gap-2">
           {isTeacher() && (
             <li>
-              <a href="/profile" className="btn btn-ghost flex items-center gap-2">
+              <a href={user?.username ? `/teachers/${user.username}` : "/profile"} className="btn btn-ghost flex items-center gap-2">
                 <UserCircle className="w-5 h-5" />
                 My Profile
               </a>

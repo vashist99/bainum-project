@@ -83,12 +83,12 @@ const CentersPage = () => {
     <div className="min-h-screen bg-base-200">
       <Navbar />
 
-      <div className="container mx-auto p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+      <div className="container mx-auto p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Centers
           </h1>
-          <div className="flex gap-3">
+          <div className="flex gap-2 flex-shrink-0">
             <button
               onClick={() => navigate("/centers/add")}
               className="btn btn-primary gap-2"
@@ -106,7 +106,100 @@ const CentersPage = () => {
                 <span className="loading loading-spinner loading-lg"></span>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              {/* Mobile: Card layout */}
+              <div className="block md:hidden space-y-3">
+                {centers.length === 0 ? (
+                  <p className="text-center text-base-content/60 py-8">
+                    No centers added yet. Click &quot;Add Center&quot; to get started.
+                  </p>
+                ) : (
+                  centers.map((center, index) => {
+                    const isExpanded = expandedCenters.has(center._id);
+                    const centerTeachers = getTeachersForCenter(center.name);
+                    const hasTeachers = centerTeachers.length > 0;
+                    return (
+                      <div key={center._id} className="card bg-base-200 border border-base-300 overflow-hidden">
+                        <div
+                          className="card-body p-4"
+                          onClick={() => isAdmin() && hasTeachers && toggleCenterExpansion(center._id)}
+                          role={isAdmin() && hasTeachers ? "button" : undefined}
+                          tabIndex={isAdmin() && hasTeachers ? 0 : undefined}
+                          onKeyDown={(e) => isAdmin() && hasTeachers && (e.key === "Enter" || e.key === " ") && toggleCenterExpansion(center._id)}
+                        >
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {isAdmin() && hasTeachers && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); toggleCenterExpansion(center._id); }}
+                                    className="btn btn-ghost btn-xs btn-circle flex-shrink-0"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-4 h-4" />
+                                    ) : (
+                                      <ChevronRight className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
+                                <h3 className="font-semibold text-base flex items-center gap-2">
+                                  <Building2 className="w-4 h-4 text-primary flex-shrink-0" />
+                                  <span className="text-base-content/60">#{index + 1}</span>
+                                  {center.name}
+                                  {hasTeachers && (
+                                    <span className="badge badge-sm badge-secondary">{centerTeachers.length}</span>
+                                  )}
+                                </h3>
+                              </div>
+                              <div className="text-sm text-base-content/70 mt-1 space-y-1">
+                                <p>{center.address || "N/A"}</p>
+                                <p>{center.phone || "N/A"}</p>
+                                <p className="truncate">{center.email || "N/A"}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => navigate(`/centers/edit/${center._id}`)}
+                                className="btn btn-ghost btn-xs"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(center._id)}
+                                className="btn btn-ghost btn-xs text-error"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                          {isAdmin() && isExpanded && hasTeachers && (
+                            <div className="mt-3 pt-3 border-t border-base-300 space-y-2">
+                              <h4 className="font-semibold text-sm text-base-content/70">
+                                Teachers at {center.name} ({centerTeachers.length})
+                              </h4>
+                              {centerTeachers.map((teacher) => (
+                                <div
+                                  key={teacher._id}
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/data/teacher/${teacher._id}`); }}
+                                  className="flex items-center justify-between p-2 rounded-lg bg-base-100 hover:bg-base-300 cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-primary" />
+                                    <span className="font-medium text-sm">{teacher.name}</span>
+                                  </div>
+                                  <ChevronRight className="w-4 h-4 text-base-content/60" />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {/* Desktop: Table layout */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="table table-zebra">
                   <thead>
                     <tr>
@@ -163,10 +256,10 @@ const CentersPage = () => {
                                 )}
                               </td>
                             )}
-                            <td>{index + 1}</td>
-                            <td>
+                            <td className="align-middle">{index + 1}</td>
+                            <td className="align-middle pl-3">
                               <div className="flex items-center gap-2">
-                                <Building2 className="w-5 h-5 text-primary" />
+                                <Building2 className="w-5 h-5 text-primary flex-shrink-0" />
                                 {center.name}
                                 {isAdmin() && hasTeachers && (
                                   <span className="badge badge-sm badge-secondary">
@@ -175,10 +268,10 @@ const CentersPage = () => {
                                 )}
                               </div>
                             </td>
-                            <td>{center.address || 'N/A'}</td>
-                            <td>{center.phone || 'N/A'}</td>
-                            <td>{center.email || 'N/A'}</td>
-                            <td onClick={(e) => e.stopPropagation()}>
+                            <td className="align-middle">{center.address || 'N/A'}</td>
+                            <td className="align-middle">{center.phone || 'N/A'}</td>
+                            <td className="align-middle">{center.email || 'N/A'}</td>
+                            <td className="align-middle" onClick={(e) => e.stopPropagation()}>
                               <div className="flex gap-2">
                                 <button 
                                   onClick={() => navigate(`/centers/edit/${center._id}`)}
@@ -248,6 +341,7 @@ const CentersPage = () => {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </div>
         </div>

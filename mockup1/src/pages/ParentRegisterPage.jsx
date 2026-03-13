@@ -16,6 +16,7 @@ const ParentRegisterPage = () => {
   const [invitationData, setInvitationData] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
+    username: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -66,8 +67,12 @@ const ParentRegisterPage = () => {
   };
 
   const validateForm = () => {
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+    if (!formData.name || !formData.username || !formData.email || !formData.password || !formData.confirmPassword) {
       toast.error("Please fill in all fields");
+      return false;
+    }
+    if (!/^[a-z0-9_]{3,30}$/.test(formData.username.toLowerCase().trim())) {
+      toast.error("Username must be 3-30 chars: lowercase letters, numbers, underscore only");
       return false;
     }
 
@@ -105,6 +110,7 @@ const ParentRegisterPage = () => {
     try {
       const response = await axios.post("/api/auth/register-parent", {
         name: formData.name,
+        username: formData.username.toLowerCase().trim(),
         email: formData.email,
         password: formData.password,
         invitationToken: token,
@@ -211,6 +217,23 @@ const ParentRegisterPage = () => {
                   required
                 />
               </div>
+            </div>
+
+            {/* Username Field */}
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">Username</span>
+                <span className="label-text-alt">3-30 chars, lowercase, numbers, underscore</span>
+              </label>
+              <input
+                type="text"
+                name="username"
+                placeholder="johndoe"
+                className="input input-bordered input-primary w-full"
+                value={formData.username}
+                onChange={handleInputChange}
+                required
+              />
             </div>
 
             {/* Email Field */}
