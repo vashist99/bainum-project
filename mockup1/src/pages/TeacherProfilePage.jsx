@@ -12,7 +12,6 @@ import ClassroomUploadModal from "../components/ClassroomUploadModal";
 
 const TeacherProfilePage = () => {
   const { user } = useAuth();
-  if (user?.username) return <Navigate to={`/teachers/${user.username}`} replace />;
   const [teacher, setTeacher] = useState(null);
   const [assessments, setAssessments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +41,8 @@ const TeacherProfilePage = () => {
     };
     fetchData();
   }, [user?.id]);
+
+  if (user?.username) return <Navigate to={`/teachers/${user.username}`} replace />;
 
   const handleUploadSuccess = () => {
     setShowUploadModal(false);
