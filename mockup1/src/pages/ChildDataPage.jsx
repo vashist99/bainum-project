@@ -504,6 +504,7 @@ const ChildDataPage = () => {
                 <option value="semicircular">Semicircular Dials</option>
               </select>
             </div>
+            {!isParent() && (
             <button
               onClick={() => setShowUploadModal(true)}
               className="btn btn-primary gap-2"
@@ -511,6 +512,7 @@ const ChildDataPage = () => {
               <Mic className="w-5 h-5" />
               Upload Recording
             </button>
+            )}
           </div>
         </div>
 
@@ -1032,8 +1034,8 @@ const ChildDataPage = () => {
           </div>
         )}
 
-        {/* Upload Recording Modal */}
-        {showUploadModal && (
+        {/* Upload Recording Modal (teachers/admins only) */}
+        {showUploadModal && !isParent() && (
           <div className="modal modal-open">
             <div className="modal-box max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
