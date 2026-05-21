@@ -1,35 +1,36 @@
 import axios from 'axios';
 
-// Get API base URL from environment variable
-// In development (localhost), use empty string to leverage Vite proxy
-// In production, set VITE_API_URL to your backend URL (e.g., https://your-backend.vercel.app)
-// Vite requires environment variables to be prefixed with VITE_ to be accessible in the browser
+// Base URL resolution order:
+//   1. Local dev (vite dev server / localhost host): empty string so requests hit
+//      the Vite proxy configured in vite.config.js, which forwards /api to the
+//      local backend on :5000.
+//   2. Production with VITE_API_URL set at build time: use it (trailing slash
+//      stripped). This is the override hook for staging / alt-backends.
+//   3. Production fallback: a hardcoded production backend URL so the app
+//      keeps working even when VITE_API_URL is missing or misconfigured on the
+//      hosting provider (Vercel env-var didn't reach the build, build cache
+//      reused, GitHub Actions overwrote the deploy, etc.). The previous
+//      empty-string fallback caused axios to resolve /api/* against the
+//      frontend's own origin, which Vercel's SPA rewrite rejected with 405.
 
-// Check if we're in development mode (localhost)
-const isDevelopment = import.meta.env.DEV || 
-                      window.location.hostname === 'localhost' || 
+const PRODUCTION_API_URL = 'https://bainum-project-backend.onrender.com';
+
+const isDevelopment = import.meta.env.DEV ||
+                      window.location.hostname === 'localhost' ||
                       window.location.hostname === '127.0.0.1' ||
                       window.location.hostname === '';
 
-// Get the API URL from environment variable
 const envApiUrl = import.meta.env.VITE_API_URL;
 
-// Determine the base URL:
-// Priority 1: If in development, ALWAYS use empty string (leverages Vite proxy) - ignore VITE_API_URL
-// Priority 2: If in production and VITE_API_URL is set, use it
-// Priority 3: If in production and no VITE_API_URL, warn and use empty (will fail, but won't break)
 let API_BASE_URL = '';
 
 if (isDevelopment) {
-  // Development mode - ALWAYS use Vite proxy, ignore VITE_API_URL
   API_BASE_URL = '';
 } else if (envApiUrl) {
-  // Production mode with env var - use it (remove trailing slash if present)
   API_BASE_URL = envApiUrl.replace(/\/$/, '');
 } else {
-  // Production mode without env var - this is an error, but use empty to prevent breaking
-  console.error('⚠️ VITE_API_URL is not set in production! API requests will fail.');
-  API_BASE_URL = '';
+  console.warn(`VITE_API_URL not set at build time; falling back to ${PRODUCTION_API_URL}.`);
+  API_BASE_URL = PRODUCTION_API_URL;
 }
 
 
