@@ -1,7 +1,8 @@
 import { useAuth } from '../contexts/AuthContext';
+import { getPrimaryChildId } from '../utils/parentChildren.js';
 import { Navigate } from 'react-router';
 
-const ProtectedRoute = ({ children, requiredRole = null, excludeRoles = [] }) => {
+const ProtectedRoute = ({ children, requiredRole = null, excludeRoles = [], skipParentHomeRedirect = false }) => {
   const { user, hasRole, loading, isParent } = useAuth();
 
   // Show loading while checking authentication
@@ -19,8 +20,9 @@ const ProtectedRoute = ({ children, requiredRole = null, excludeRoles = [] }) =>
   }
 
   // Redirect parents to their child's page if they try to access restricted pages
-  if (isParent() && user?.childId && excludeRoles.length === 0 && !requiredRole) {
-    return <Navigate to={`/data/child/${user.childId}`} replace />;
+  const primaryChild = getPrimaryChildId(user);
+  if (isParent() && primaryChild && excludeRoles.length === 0 && !requiredRole && !skipParentHomeRedirect) {
+    return <Navigate to={`/data/child/${primaryChild}`} replace />;
   }
 
   // Check if role is excluded
@@ -34,9 +36,9 @@ const ProtectedRoute = ({ children, requiredRole = null, excludeRoles = [] }) =>
             <p className="text-base-content/70 mb-4">
               This page is not available for your role.
             </p>
-            {user?.childId && (
+            {primaryChild && (
               <div className="card-actions justify-center">
-                <a href={`/data/child/${user.childId}`} className="btn btn-primary">
+                <a href={`/data/child/${primaryChild}`} className="btn btn-primary">
                   Go to Child's Page
                 </a>
               </div>

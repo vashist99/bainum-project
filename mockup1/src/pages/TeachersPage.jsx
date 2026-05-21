@@ -21,6 +21,23 @@ const TeachersPage = () => {
   const [sendingInvite, setSendingInvite] = useState(false);
   const [sortByCenter, setSortByCenter] = useState(null); // null | 'asc' | 'desc'
   const [sortByLanguage, setSortByLanguage] = useState(null); // null | 'asc' | 'desc'
+  /** Lowercased emails that already have a teacher invitation sent */
+  const [invitedTeacherEmails, setInvitedTeacherEmails] = useState(() => new Set());
+
+  useEffect(() => {
+    if (!isAdmin()) return;
+    axios
+      .get("/api/teacher-invitations/list")
+      .then((res) => {
+        const next = new Set();
+        (res.data?.invitations || []).forEach((inv) => {
+          const e = (inv?.email || "").toLowerCase().trim();
+          if (e) next.add(e);
+        });
+        setInvitedTeacherEmails(next);
+      })
+      .catch(() => {});
+  }, [isAdmin]);
 
   // Load teachers from API on component mount
   useEffect(() => {
@@ -156,6 +173,8 @@ const TeachersPage = () => {
   };
 
   const openInviteModal = (teacher) => {
+    const em = (teacher?.email || "").toLowerCase().trim();
+    if (em && invitedTeacherEmails.has(em)) return;
     setSelectedTeacherForInvite(teacher);
     setInviteEmail(teacher.email || "");
     setShowInviteModal(true);
@@ -226,6 +245,11 @@ const TeachersPage = () => {
         }
       } else {
         toast.success("Teacher invitation sent successfully!");
+      }
+
+      const em = inviteEmail.toLowerCase().trim();
+      if (em) {
+        setInvitedTeacherEmails((prev) => new Set([...prev, em]));
       }
 
       // Reset and close modal
@@ -510,17 +534,27 @@ const TeachersPage = () => {
                                     {teacherChildren.length}
                                   </span>
                                 )}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openInviteModal(teacher);
-                                  }}
-                                  className="btn btn-primary btn-xs gap-1 ml-2"
-                                  title="Send invitation to teacher"
-                                >
-                                  <Mail className="w-3 h-3" />
-                                  Invite
-                                </button>
+                                {invitedTeacherEmails.has((teacher.email || "").toLowerCase().trim()) ? (
+                                  <span
+                                    className="btn btn-ghost btn-xs gap-1 ml-2 no-animation pointer-events-none opacity-80 cursor-default border border-base-300"
+                                    title="Invitation already sent for this email"
+                                  >
+                                    Invited
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openInviteModal(teacher);
+                                    }}
+                                    className="btn btn-primary btn-xs gap-1 ml-2"
+                                    title="Send invitation to teacher"
+                                  >
+                                    <Mail className="w-3 h-3" />
+                                    Invite
+                                  </button>
+                                )}
                               </div>
                             </td>
                             <td className="align-middle">{teacher.email}</td>

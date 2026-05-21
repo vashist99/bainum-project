@@ -67,15 +67,9 @@ const Navbar = () => {
             )}
           </ul>
         </div>
-        {isParent() ? (
-          <span className="btn btn-ghost text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent cursor-default">
-            Bainum Project
-          </span>
-        ) : (
         <a href="/home" className="btn btn-ghost text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
           Bainum Project
         </a>
-        )}
       </div>
       
       <div className="navbar-center hidden lg:flex">

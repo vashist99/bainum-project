@@ -1,89 +1,88 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
-import { ArrowLeft, User, Calendar, Languages, Stethoscope, Users, FileText, BookOpen, MessageCircle, Microscope, Brain, Plus, Trash2, Upload, Mic, Check, X, Download } from "lucide-react";
+import { ArrowLeft, User, Calendar, Languages, Stethoscope, Users, FileText, BookOpen, MessageCircle, Microscope, Brain, Plus, Trash2, Download, Mail } from "lucide-react";
 import { LanguageDevelopmentCharts } from "../components/LanguageDevelopmentCharts";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
+import { getPrimaryChildId, parentHasAccessToChild } from "../utils/parentChildren.js";
 import { highlightRAGSegments, getSegmentsForHighlighting } from "../utils/ragHighlightSegments.js";
 import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
-
-// Rotating messages shown during audio processing
-const PROCESSING_MESSAGES = [
-  { text: "Uploading your audio file...", icon: "📤" },
-  { text: "Sending to speech recognition service...", icon: "🎙️" },
-  { text: "Transcribing speech to text... (This takes the longest!)", icon: "✍️" },
-  { text: "Analyzing for science skills—looking for scientific vocabulary...", icon: "🔬" },
-  { text: "Analyzing for social emotional skills—detecting communication patterns...", icon: "💬" },
-  { text: "Analyzing for literature skills—finding storytelling elements...", icon: "📚" },
-  { text: "Analyzing language development skills—checking vocabulary growth...", icon: "🧠" },
-  { text: "Comparing against reference examples (AI-powered)...", icon: "✨" },
-  { text: "Did you know? We track 50+ keywords in each category.", icon: "💡" },
-  { text: "Almost there! Preparing your results...", icon: "🎯" },
-];
 
 const ChildDataPage = () => {
   const { childId } = useParams();
   const navigate = useNavigate();
   const { user, isParent, isAdmin, isTeacher } = useAuth();
-
-  // Prevent parents from navigating away using browser back button
-  useEffect(() => {
-    if (isParent() && user?.childId) {
-      const handlePopState = () => {
-        // Prevent navigation away from child's page
-        window.history.pushState(null, '', `/data/child/${user.childId}`);
-        toast.info("You can only view your child's data page");
-      };
-
-      // Push current state to prevent back navigation
-      window.history.pushState(null, '', `/data/child/${user.childId}`);
-      
-      window.addEventListener('popstate', handlePopState);
-      
-      return () => {
-        window.removeEventListener('popstate', handlePopState);
-      };
-    }
-  }, [isParent, user, childId]);
   const [child, setChild] = useState(null);
+  const [parentChildren, setParentChildren] = useState([]);
+  const [loadingParentChildren, setLoadingParentChildren] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState("");
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [audioFile, setAudioFile] = useState(null);
-  const [recordingDate, setRecordingDate] = useState(new Date().toISOString().split('T')[0]); // Default to today
-  const [uploading, setUploading] = useState(false);
   const [, setLatestAssessment] = useState(null);
   const [allAssessments, setAllAssessments] = useState([]);
   const [viewMode, setViewMode] = useState("dotmatrix"); // "dotmatrix" or "semicircular"
-  const [showTranscriptModal, setShowTranscriptModal] = useState(false);
-  const [pendingTranscript, setPendingTranscript] = useState(null);
-  const [pendingAssessment, setPendingAssessment] = useState(null);
   const [teachers, setTeachers] = useState([]);
   const [allChildren, setAllChildren] = useState([]);
   const [loadingTeachers, setLoadingTeachers] = useState(false);
-  const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
   const [cohortThresholdsByCategory, setCohortThresholdsByCategory] = useState(null);
-  const abortControllerRef = useRef(null);
+  /** Teacher must have parent-approved access; until then show invite UI */
+  const [teacherAccessDenied, setTeacherAccessDenied] = useState(false);
+  const [childPreview, setChildPreview] = useState(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [sendingInvite, setSendingInvite] = useState(false);
+  /** True when an invitation already exists for this child (teacher access-denied panel) */
+  const [parentInviteAlreadySent, setParentInviteAlreadySent] = useState(false);
 
-  // Rotate processing messages while audio is uploading
   useEffect(() => {
-    if (!uploading) {
-      setProcessingMessageIndex(0);
+    if (!isParent()) return;
+    let cancelled = false;
+    const fetchParentChildren = async () => {
+      try {
+        setLoadingParentChildren(true);
+        const response = await axios.get("/api/children");
+        if (!cancelled) {
+          setParentChildren(Array.isArray(response.data?.children) ? response.data.children : []);
+        }
+      } catch {
+        if (!cancelled) setParentChildren([]);
+      } finally {
+        if (!cancelled) setLoadingParentChildren(false);
+      }
+    };
+    fetchParentChildren();
+    return () => {
+      cancelled = true;
+    };
+  }, [isParent, user?.id]);
+
+  useEffect(() => {
+    if (!teacherAccessDenied || !childPreview?._id) {
+      setParentInviteAlreadySent(false);
       return;
     }
-    const interval = setInterval(() => {
-      setProcessingMessageIndex((prev) => (prev + 1) % PROCESSING_MESSAGES.length);
-    }, 3200);
-    return () => clearInterval(interval);
-  }, [uploading]);
+    const cid = String(childPreview._id);
+    axios
+      .get("/api/invitations/list")
+      .then((res) => {
+        const has = (res.data?.invitations || []).some((inv) => {
+          if (Array.isArray(inv.childIds) && inv.childIds.length) {
+            return inv.childIds.some((id) => String(id) === cid);
+          }
+          return String(inv.childId) === cid;
+        });
+        setParentInviteAlreadySent(has);
+      })
+      .catch(() => setParentInviteAlreadySent(false));
+  }, [teacherAccessDenied, childPreview]);
 
   useEffect(() => {
     const fetchChild = async () => {
       try {
         setLoading(true);
+        setTeacherAccessDenied(false);
+        setChildPreview(null);
         const response = await axios.get(`/api/children/${childId}`);
         const childData = response.data.child;
         
@@ -95,27 +94,34 @@ const ChildDataPage = () => {
         }
         
         // If user is a parent, verify they have access to this child
-        if (user?.role === 'parent' && user?.childId) {
-          const userChildId = typeof user.childId === 'string' ? user.childId : user.childId.toString();
+        if (user?.role === 'parent') {
           const currentChildId = childData._id?.toString() || childData.id?.toString();
-          
-          if (userChildId !== currentChildId) {
+          if (!parentHasAccessToChild(user, currentChildId)) {
             toast.error("You don't have access to this child's data");
-            // Redirect to their own child's page instead of home
-            navigate(`/data/child/${user.childId}`, { replace: true });
+            const fallback = getPrimaryChildId(user);
+            if (fallback) navigate(`/data/child/${fallback}`, { replace: true });
             return;
           }
         }
         
+        setTeacherAccessDenied(false);
+        setChildPreview(null);
         setChild(childData);
       } catch (error) {
         console.error("Error fetching child:", error);
+        const errData = error.response?.data;
+        if (error.response?.status === 403 && errData?.code === "TEACHER_ACCESS_DENIED" && errData?.child) {
+          setTeacherAccessDenied(true);
+          setChildPreview(errData.child);
+          setChild(null);
+          return;
+        }
         if (error.response?.status === 403) {
-          toast.error("You don't have access to this child's data");
-          // Redirect to their own child's page if parent
-          if (user?.role === 'parent' && user?.childId) {
-            navigate(`/data/child/${user.childId}`, { replace: true });
-          } else {
+          toast.error(errData?.message || "You don't have access to this child's data");
+          if (user?.role === 'parent') {
+            const fallback = getPrimaryChildId(user);
+            if (fallback) navigate(`/data/child/${fallback}`, { replace: true });
+          } else if (user?.role !== 'teacher') {
             navigate("/home");
           }
         }
@@ -131,6 +137,7 @@ const ChildDataPage = () => {
   // Load notes from database
   useEffect(() => {
     const fetchNotes = async () => {
+      if (teacherAccessDenied) return;
       if (childId) {
         try {
           const response = await axios.get(`/api/notes/child/${childId}`);
@@ -146,11 +153,12 @@ const ChildDataPage = () => {
     };
 
     fetchNotes();
-  }, [childId]);
+  }, [childId, teacherAccessDenied]);
 
   // Load latest assessment from database
   useEffect(() => {
     const fetchLatestAssessment = async () => {
+      if (teacherAccessDenied) return;
       if (childId) {
         try {
           const response = await axios.get(`/api/assessments/child/${childId}/latest`);
@@ -165,11 +173,12 @@ const ChildDataPage = () => {
     };
 
     fetchLatestAssessment();
-  }, [childId]);
+  }, [childId, teacherAccessDenied]);
 
   // Load all assessments from database for aggregation
   useEffect(() => {
     const fetchAllAssessments = async () => {
+      if (teacherAccessDenied) return;
       if (childId) {
         try {
           const response = await axios.get(`/api/assessments/child/${childId}`);
@@ -182,7 +191,7 @@ const ChildDataPage = () => {
     };
 
     fetchAllAssessments();
-  }, [childId]);
+  }, [childId, teacherAccessDenied]);
 
   // Load cohort WPM stats for children (used for semicircular dial zones)
   useEffect(() => {
@@ -258,127 +267,39 @@ const ChildDataPage = () => {
     }
   };
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file size (25MB limit)
-      if (file.size > 25 * 1024 * 1024) {
-        toast.error("File size must be less than 25MB");
-        return;
-      }
-      setAudioFile(file);
-    }
-  };
-
-  const handleCancelProcessing = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-  };
-
-  const handleUploadAudio = async () => {
-    if (!audioFile) {
-      toast.error("Please select an audio file");
+  const handleSendInviteToParent = async () => {
+    if (!inviteEmail.trim()) {
+      toast.error("Please enter the parent's email address");
       return;
     }
-
-    if (!recordingDate) {
-      toast.error("Please select a recording date");
+    const cid = childPreview?._id || childId;
+    if (!cid) {
+      toast.error("Missing child");
       return;
     }
-
-    setUploading(true);
-    abortControllerRef.current = new AbortController();
-
+    setSendingInvite(true);
     try {
-      const formData = new FormData();
-      formData.append('audio', audioFile);
-      formData.append('childId', childId);
-      formData.append('uploadedBy', user?.name || "Unknown");
-      formData.append('recordingDate', recordingDate);
-
-      const response = await axios.post('/api/whisper', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        signal: abortControllerRef.current.signal,
+      const response = await axios.post("/api/invitations/send", {
+        email: inviteEmail.trim(),
+        childId: cid,
       });
-
-
-      // Store transcript and assessment data for review
-      if (response.data.transcript && response.data.assessment) {
-        setPendingTranscript(response.data.transcript);
-        setPendingAssessment({
-          ...response.data.assessment,
-          ragSegments: response.data.ragSegments || null
-        });
-
-        // Close upload modal and show transcript modal
-      setShowUploadModal(false);
-      setAudioFile(null);
-        setShowTranscriptModal(true);
+      if (response.data.warning || response.data.invitation?.invitationLink) {
+        const link =
+          response.data.invitation?.invitationLink ||
+          response.data.invitationLink ||
+          `${window.location.origin}/parent/register?token=${response.data.invitation?.token}`;
+        toast.error("Invitation created but email may have failed. Copy the link if needed.", { duration: 8000 });
+        navigator.clipboard.writeText(link).then(() => toast.success("Invitation link copied"));
       } else {
-        // Fallback if no transcript (shouldn't happen, but handle gracefully)
-        toast.error("No transcript received from server");
-        setUploading(false);
+        toast.success("Invitation sent. The parent must register or accept before you can view this page.");
       }
+      setParentInviteAlreadySent(true);
+      setInviteEmail("");
     } catch (error) {
-      if (axios.isCancel?.(error) || error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
-        toast.success("Processing cancelled");
-      } else {
-        const errorMessage = error.response?.data?.message || "Failed to process audio";
-        toast.error(errorMessage);
-        console.error("Error uploading audio:", error);
-      }
+      toast.error(error.response?.data?.message || "Failed to send invitation");
     } finally {
-      setUploading(false);
-      abortControllerRef.current = null;
+      setSendingInvite(false);
     }
-  };
-
-  const handleAcceptTranscript = async () => {
-    try {
-      
-      // Save the assessment to the server
-      const response = await axios.post('/api/assessments/accept', pendingAssessment);
-      
-      
-      toast.success("Assessment saved successfully!");
-      
-      // Update local state with saved assessment
-      setLatestAssessment(response.data.assessment);
-      
-      // Reload all assessment data to ensure we have the latest
-      const assessmentResponse = await axios.get(`/api/assessments/child/${childId}/latest`);
-      setLatestAssessment(assessmentResponse.data.assessment);
-      
-// Reload all assessments for aggregation
-      const allAssessmentsResponse = await axios.get(`/api/assessments/child/${childId}`);
-      setAllAssessments(allAssessmentsResponse.data.assessments || []);
-
-      // Refetch children cohort stats (recalculated on accept) so dial thresholds update
-      axios.get(`/api/assessments/cohort-stats/children`).then((res) => {
-        setCohortThresholdsByCategory(res.data?.cohortStats || null);
-      }).catch(() => {});
-
-      // Close transcript modal and reset
-      setShowTranscriptModal(false);
-      setPendingTranscript(null);
-      setPendingAssessment(null);
-    } catch (error) {
-      console.error("Error accepting transcript:", error);
-      const errorMessage = error.response?.data?.message || "Error saving assessment";
-      toast.error(errorMessage);
-    }
-  };
-
-  const handleRejectTranscript = () => {
-    // Reject: close the modal without saving the assessment
-    setShowTranscriptModal(false);
-    setPendingTranscript(null);
-    setPendingAssessment(null);
-    toast.error("Transcript rejected. The assessment was not saved.");
   };
 
   const handleDeleteChildAssessment = async (assessmentId) => {
@@ -459,6 +380,64 @@ const ChildDataPage = () => {
     );
   }
 
+  if (isTeacher() && teacherAccessDenied && childPreview) {
+    return (
+      <div className="min-h-screen bg-base-200">
+        <Navbar />
+        <div className="container mx-auto p-4 md:p-6 max-w-2xl">
+          <button
+            type="button"
+            onClick={() => navigate("/data")}
+            className="btn btn-ghost btn-circle mb-4"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="card bg-base-100 shadow-xl">
+            <div className="card-body">
+              <h2 className="card-title text-xl">Access needed: {childPreview.name}</h2>
+              <p className="text-base-content/80">
+                A parent must accept an invitation linked to this child before you can view their full data and
+                assessments. Send an invitation to the parent&apos;s email below (same flow as the Data page).
+              </p>
+              <div className="form-control w-full mt-4">
+                <label className="label"><span className="label-text">Parent email</span></label>
+                {parentInviteAlreadySent ? (
+                  <div className="flex items-center gap-2">
+                    <span className="badge badge-lg badge-ghost border border-base-300 px-4 py-3">
+                      Invited
+                    </span>
+                    <span className="text-sm text-base-content/60">
+                      An invitation was already sent for this child.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="email"
+                      className="input input-bordered flex-1"
+                      placeholder="parent@example.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary gap-2"
+                      disabled={sendingInvite}
+                      onClick={handleSendInviteToParent}
+                    >
+                      <Mail className="w-4 h-4" />
+                      {sendingInvite ? "Sending…" : "Send invitation"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!child) {
     return (
       <div className="min-h-screen bg-base-200">
@@ -493,6 +472,38 @@ const ChildDataPage = () => {
             </h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            {isParent() && (
+              <div className="form-control">
+                <label className="label py-0 pb-1">
+                  <span className="label-text text-xs">Child</span>
+                </label>
+                <select
+                  className="select select-bordered select-primary min-w-[180px]"
+                  value={String(child?._id || childId || "")}
+                  disabled={loadingParentChildren}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    if (nextId && String(nextId) !== String(childId)) {
+                      navigate(`/data/child/${nextId}`);
+                    }
+                  }}
+                >
+                  {loadingParentChildren ? (
+                    <option value={String(child?._id || childId || "")}>Loading children...</option>
+                  ) : parentChildren.length > 0 ? (
+                    parentChildren.map((pc) => (
+                      <option key={pc._id || pc.id} value={String(pc._id || pc.id)}>
+                        {pc.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={String(child?._id || childId || "")}>
+                      {child?.name || "Selected child"}
+                    </option>
+                  )}
+                </select>
+              </div>
+            )}
             {/* View Mode Dropdown */}
             <div className="form-control">
               <select
@@ -504,15 +515,6 @@ const ChildDataPage = () => {
                 <option value="semicircular">Semicircular Dials</option>
               </select>
             </div>
-            {!isParent() && (
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="btn btn-primary gap-2"
-            >
-              <Mic className="w-5 h-5" />
-              Upload Recording
-            </button>
-            )}
           </div>
         </div>
 
@@ -687,6 +689,7 @@ const ChildDataPage = () => {
           assessments={allAssessments}
           viewMode={viewMode}
           title={`Language Development Analysis ${viewMode === "dotmatrix" ? "- Year Overview" : ""}`}
+          contextSubtitle="At Home"
           showWordScores
           cohortThresholdsByCategory={cohortThresholdsByCategory}
         />
@@ -727,7 +730,7 @@ const ChildDataPage = () => {
                   <p className="text-sm text-base-content/60 mt-1">
                     {averageWPM != null
                       ? `Average across ${allAssessments.filter((a) => a?.wordsPerMinute != null).length} recording(s)`
-                      : 'Upload recordings to see WPM (requires duration data from transcription)'}
+                      : 'WPM appears when assessments include duration data (e.g. from external ingest).'}
                   </p>
                 </div>
               </div>
@@ -876,8 +879,8 @@ const ChildDataPage = () => {
           </div>
         </div>
 
-        {/* Transcripts Section - Admin Only */}
-        {isAdmin() && (
+        {/* Transcripts Section - Admin + Parent */}
+        {(isAdmin() || isParent()) && (
           <div className="card bg-base-100 shadow-xl mb-6">
             <div className="card-body">
               <div className="flex items-center justify-between mb-4">
@@ -889,7 +892,7 @@ const ChildDataPage = () => {
                   <div className="text-sm text-base-content/60">
                     {allAssessments.filter(a => a.transcript && a.transcript.trim()).length} transcript{allAssessments.filter(a => a.transcript && a.transcript.trim()).length !== 1 ? 's' : ''} available
                   </div>
-                  {allAssessments.filter(a => a.transcript && a.transcript.trim()).length > 0 && (
+                  {isAdmin() && allAssessments.filter(a => a.transcript && a.transcript.trim()).length > 0 && (
                     <button
                       onClick={() => {
                         // Combine all transcripts into one file
@@ -904,7 +907,8 @@ const ChildDataPage = () => {
                               hour: '2-digit',
                               minute: '2-digit'
                             });
-                            return `=== Transcript from ${dateStr} ===\n${assessment.uploadedBy ? `Uploaded by: ${assessment.uploadedBy}\n` : ''}${assessment.transcript}\n\n`;
+                            const activityLine = assessment.activity ? `Activity: ${assessment.activity}\n` : '';
+                            return `=== Transcript from ${dateStr} ===\n${activityLine}${assessment.uploadedBy ? `Uploaded by: ${assessment.uploadedBy}\n` : ''}${assessment.transcript}\n\n`;
                           });
                         
                         const allTranscriptsText = transcriptsWithDates.join('\n');
@@ -943,16 +947,30 @@ const ChildDataPage = () => {
                       <div key={assessment._id} className="card bg-base-200 border border-base-300">
                         <div className="card-body p-4">
                           <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <h3 className="font-semibold text-lg flex items-center gap-2">
-                                <Calendar className="w-4 h-4" />
-                                {new Date(assessment.date).toLocaleDateString('en-US', {
-                                  month: 'long',
-                                  day: 'numeric',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-lg flex items-center gap-2 flex-wrap">
+                                <Calendar className="w-4 h-4 shrink-0" />
+                                <span>
+                                  {new Date(assessment.date).toLocaleDateString('en-US', {
+                                    month: 'long',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                                {assessment.activity && (
+                                  <span
+                                    className="badge badge-outline badge-primary badge-sm font-normal"
+                                    title={
+                                      assessment.activityContext === 'school'
+                                        ? 'Activity recorded at school'
+                                        : 'Activity recorded at home'
+                                    }
+                                  >
+                                    {assessment.activity}
+                                  </span>
+                                )}
                               </h3>
                               {assessment.uploadedBy && (
                                 <p className="text-sm text-base-content/60 mt-1">
@@ -960,13 +978,15 @@ const ChildDataPage = () => {
                                 </p>
                               )}
                             </div>
-                            <button
-                              onClick={() => handleDeleteChildAssessment(assessment._id)}
-                              className="btn btn-ghost btn-sm btn-circle text-error"
-                              title="Delete transcript"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {isAdmin() && (
+                              <button
+                                onClick={() => handleDeleteChildAssessment(assessment._id)}
+                                className="btn btn-ghost btn-sm btn-circle text-error"
+                                title="Delete transcript"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                           
                           <div className="bg-base-100 p-4 rounded-lg border border-base-300 max-h-64 overflow-y-auto">
@@ -1034,281 +1054,6 @@ const ChildDataPage = () => {
           </div>
         )}
 
-        {/* Upload Recording Modal (teachers/admins only) */}
-        {showUploadModal && !isParent() && (
-          <div className="modal modal-open">
-            <div className="modal-box max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
-                <Mic className="w-6 h-6 text-primary" />
-                Upload Audio Recording
-              </h3>
-              
-              <div className="divider"></div>
-
-              {/* Keywords Info */}
-              <div className="alert alert-info mb-4">
-                <div className="w-full">
-                  <h4 className="font-semibold mb-2">Keywords Being Tracked:</h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className="font-semibold text-blue-600">🔬 Science:</span>
-                      <span className="ml-2">experiment, hypothesis, observe, predict, measure</span>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-green-600">👥 Social:</span>
-                      <span className="ml-2">friend, share, help, together, feelings</span>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-purple-600">📚 Literature:</span>
-                      <span className="ml-2">story, character, beginning, ending, imagine</span>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-orange-600">💬 Language:</span>
-                      <span className="ml-2">word, sentence, speak, listen, communicate</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* File Upload */}
-              <div className="form-control w-full mb-4">
-                <label className="label">
-                  <span className="label-text font-semibold">Select Audio File</span>
-                  <span className="label-text-alt">Max size: 25MB</span>
-                </label>
-                <input
-                  type="file"
-                  accept="audio/*,.mp3,.wav,.m4a,.webm,.mp4,.mpeg,.mpga,.oga,.ogg"
-                  onChange={handleFileSelect}
-                  className="file-input file-input-bordered file-input-primary w-full"
-                />
-                {audioFile && (
-                  <label className="label">
-                    <span className="label-text-alt text-success">
-                      ✓ Selected: {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} MB)
-                    </span>
-                  </label>
-                )}
-              </div>
-
-              {/* Recording Date */}
-              <div className="form-control w-full mb-4">
-                <label className="label">
-                  <span className="label-text font-semibold flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    Recording Date
-                  </span>
-                  <span className="label-text-alt">Date when recording was made</span>
-                </label>
-                <input
-                  type="date"
-                  value={recordingDate}
-                  onChange={(e) => setRecordingDate(e.target.value)}
-                  className="input input-bordered input-primary w-full"
-                  min={`${new Date().getFullYear()}-01-01`}
-                  max={new Date().toISOString().split('T')[0]}
-                  title="Recording date must be in the current year, up to today"
-                />
-              </div>
-
-              {/* Processing Info */}
-              {uploading && (
-                <div className="mb-4 overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5">
-                  <div className="flex items-start gap-4 p-4">
-                    <div className="flex-shrink-0">
-                      <span className="loading loading-spinner loading-lg text-primary"></span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-base mb-1">Processing your recording</p>
-                      <p className="text-sm text-base-content/70 flex items-center gap-2 transition-opacity duration-300">
-                        <span className="text-lg">{PROCESSING_MESSAGES[processingMessageIndex].icon}</span>
-                        {PROCESSING_MESSAGES[processingMessageIndex].text}
-                      </p>
-                      <div className="mt-2 flex gap-1">
-                        {PROCESSING_MESSAGES.map((_, i) => (
-                          <div
-                            key={i}
-                            className={`h-1 rounded-full transition-all duration-300 ${
-                              i === processingMessageIndex
-                                ? "w-4 bg-primary"
-                                : i < processingMessageIndex
-                                ? "w-2 bg-primary/40"
-                                : "w-2 bg-base-300"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Modal Actions */}
-              <div className="modal-action">
-                <button
-                  onClick={() => {
-                    if (uploading) {
-                      handleCancelProcessing();
-                    } else {
-                      setShowUploadModal(false);
-                      setAudioFile(null);
-                      setRecordingDate(new Date().toISOString().split('T')[0]);
-                    }
-                  }}
-                  className="btn btn-ghost"
-                >
-                  {uploading ? "Cancel Processing" : "Cancel"}
-                </button>
-                <button
-                  onClick={handleUploadAudio}
-                  className="btn btn-primary gap-2"
-                  disabled={!audioFile || uploading}
-                >
-                  {uploading ? (
-                    <>
-                      <span className="loading loading-spinner"></span>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4" />
-                      Upload & Analyze
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-            <div className="modal-backdrop" onClick={() => !uploading && setShowUploadModal(false)}></div>
-          </div>
-        )}
-
-        {/* Transcript Review Modal */}
-        {showTranscriptModal && pendingTranscript && (
-          <div className="modal modal-open">
-            <div className="modal-backdrop bg-black/50" onClick={handleRejectTranscript} aria-hidden="true"></div>
-            <div className="modal-box max-w-3xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto relative z-[100] bg-base-100">
-              <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
-                <FileText className="w-6 h-6 text-primary" />
-                Review Transcript
-              </h3>
-              
-              <div className="divider"></div>
-
-              {/* Transcript Display */}
-              <div className="mb-4">
-                <label className="label">
-                  <span className="label-text font-semibold">Transcribed Text</span>
-                </label>
-                <div className="bg-base-200 p-4 rounded-lg border border-base-300 max-h-96 overflow-y-auto">
-                  {(() => {
-                    const segments = getSegmentsForHighlighting(pendingTranscript, pendingAssessment?.ragSegments);
-                    return segments.length > 0 ? (
-                      <>
-                        <RAGColorLegend />
-                        <p className="text-base whitespace-pre-wrap leading-relaxed">
-                          {highlightRAGSegments(pendingTranscript, segments)}
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-base whitespace-pre-wrap leading-relaxed">
-                        {pendingTranscript || "No transcript available"}
-                      </p>
-                    );
-                  })()}
-                </div>
-                {pendingTranscript && (
-                  <label className="label">
-                    <span className="label-text-alt text-base-content/60">
-                      {pendingTranscript.length} characters
-                    </span>
-                  </label>
-                )}
-              </div>
-
-              {/* Assessment Preview */}
-              {pendingAssessment && (
-                <div className="mb-4">
-                  <label className="label">
-                    <span className="label-text font-semibold">Results (WPM = classified words ÷ audio length)</span>
-                  </label>
-                  <div className="stat bg-primary/10 border border-primary/30 rounded-lg p-4">
-                    <div className="mb-3 text-sm text-base-content/70">
-                      <span className="font-medium">Audio length:</span>{' '}
-                      {pendingAssessment.durationSeconds != null
-                        ? `${Math.floor(pendingAssessment.durationSeconds / 60)} min ${Math.round(pendingAssessment.durationSeconds % 60)} sec`
-                        : '—'}
-                      {pendingAssessment.wordCount != null && (
-                        <span className="ml-3">
-                          <span className="font-medium">Total words:</span> {pendingAssessment.wordCount}
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                      {[
-                        { key: 'science', label: 'Science', color: 'text-blue-600' },
-                        { key: 'social', label: 'Social', color: 'text-green-600' },
-                        { key: 'literature', label: 'Literature', color: 'text-purple-600' },
-                        { key: 'language', label: 'Language', color: 'text-orange-600' }
-                      ].map(({ key, label, color }) => {
-                        const words = pendingAssessment.categoryWordCount?.[key] ?? 0;
-                        const wpm = pendingAssessment.categoryWPM?.[key];
-                        return (
-                          <div key={key} className={`text-sm ${color} border border-base-300 rounded p-2`}>
-                            <div className="font-medium">{label}</div>
-                            <div>{words} word{words !== 1 ? 's' : ''}</div>
-                            <div className="text-xs opacity-80">
-                              {wpm != null ? `${Math.round(wpm * 10) / 10} WPM` : '— WPM'}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="stat-value text-xl text-primary border-t border-primary/20 pt-2">
-                      {pendingAssessment.wordsPerMinute != null
-                        ? `${Math.round((pendingAssessment.wordsPerMinute || 0) * 10) / 10} WPM`
-                        : 'N/A'} <span className="text-sm font-normal text-base-content/70">(overall)</span>
-                    </div>
-                    <div className="stat-desc text-sm text-base-content/70">
-                      {pendingAssessment.wordsPerMinute != null
-                        ? `${pendingAssessment.wordCount || 0} words ÷ ${pendingAssessment.durationSeconds ? `${(pendingAssessment.durationSeconds / 60).toFixed(1)} min` : '—'} = overall WPM`
-                        : 'Duration not available from transcription'}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="alert alert-info mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span className="text-sm">Please review the transcript above. Click Accept to save this assessment or Reject to cancel.</span>
-              </div>
-
-              {/* Modal Actions */}
-              <div className="modal-action">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleRejectTranscript();
-                  }}
-                  className="btn btn-ghost gap-2"
-                >
-                  <X className="w-4 h-4" />
-                  Reject
-                </button>
-                <button
-                  onClick={handleAcceptTranscript}
-                  className="btn btn-primary gap-2"
-                >
-                  <Check className="w-4 h-4" />
-                  Accept & Save
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

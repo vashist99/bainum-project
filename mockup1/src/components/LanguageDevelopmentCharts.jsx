@@ -156,7 +156,7 @@ const DotMatrixWPM = ({ monthlyWPM, config }) => {
 
 const CATEGORIES = ['science', 'social', 'literature', 'language'];
 
-export function LanguageDevelopmentCharts({ assessments = [], viewMode = 'dotmatrix', title = 'Language Development Analysis', showWordScores = false, cohortThresholdsByCategory = null }) {
+export function LanguageDevelopmentCharts({ assessments = [], viewMode = 'dotmatrix', title = 'Language Development Analysis', contextSubtitle = null, showWordScores = false, cohortThresholdsByCategory = null }) {
   const monthlyWPMByCategory = useMemo(() => {
     const result = {};
     CATEGORIES.forEach((cat) => {
@@ -225,7 +225,10 @@ export function LanguageDevelopmentCharts({ assessments = [], viewMode = 'dotmat
   return (
     <div className="card bg-base-100 shadow-xl mb-6">
       <div className="card-body">
-        <h2 className="card-title text-2xl mb-4">{title}</h2>
+        <h2 className={`card-title text-2xl ${contextSubtitle ? "mb-1" : "mb-4"}`}>{title}</h2>
+        {contextSubtitle ? (
+          <p className="text-center text-sm text-base-content/70 mb-3">{contextSubtitle}</p>
+        ) : null}
         <div className="divider" />
 
         {viewMode === 'semicircular' ? (

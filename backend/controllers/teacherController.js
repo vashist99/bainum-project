@@ -1,4 +1,7 @@
-import { Teacher } from "../models/User.js";
+import { Teacher, Parent } from "../models/User.js";
+import { hasActiveParentTeacherGrantForAnyChild } from "../lib/accessGrantHelpers.js";
+import { getResolvedChildIdStringsForParent } from "../lib/parentChildHelpers.js";
+import AccessGrant from "../models/AccessGrant.js";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 
@@ -98,6 +101,30 @@ export const createTeacher = async (req, res) => {
 
 export const getAllTeachers = async (req, res) => {
     try {
+        const user = req.user;
+        if (user?.role === "parent") {
+            const parent = await Parent.findById(user.id);
+            if (!parent) {
+                return res.status(404).json({ message: "Parent not found" });
+            }
+            const childIdStrs = await getResolvedChildIdStringsForParent(parent);
+            if (childIdStrs.length === 0) {
+                return res.status(200).json({ teachers: [] });
+            }
+            const grants = await AccessGrant.find({
+                parentId: parent._id,
+                childId: { $in: childIdStrs },
+                status: "active",
+            })
+                .select("teacherId")
+                .lean();
+            const ids = [...new Set(grants.map((g) => g.teacherId).filter(Boolean))];
+            if (ids.length === 0) {
+                return res.status(200).json({ teachers: [] });
+            }
+            const teachers = await Teacher.find({ _id: { $in: ids } });
+            return res.status(200).json({ teachers });
+        }
         const teachers = await Teacher.find();
         res.status(200).json({ teachers });
     } catch (error) {
@@ -118,6 +145,28 @@ export const getTeacherById = async (req, res) => {
         if (!teacher) {
             return res.status(404).json({ message: "Teacher not found" });
         }
+
+        if (req.user?.role === "parent") {
+            const parent = await Parent.findById(req.user.id);
+            if (!parent) {
+                return res.status(404).json({ message: "Parent not found" });
+            }
+            const childIdStrs = await getResolvedChildIdStringsForParent(parent);
+            const ok = await hasActiveParentTeacherGrantForAnyChild(parent._id, teacher._id, childIdStrs);
+            if (!ok) {
+                return res.status(403).json({
+                    code: "PARENT_TEACHER_ACCESS_DENIED",
+                    message:
+                        "Request access from this teacher or wait until they invite you before viewing their data.",
+                    teacher: {
+                        _id: teacher._id,
+                        name: teacher.name,
+                        username: teacher.username,
+                    },
+                });
+            }
+        }
+
         res.status(200).json({ teacher });
     } catch (error) {
         console.error("Error fetching teacher:", error);

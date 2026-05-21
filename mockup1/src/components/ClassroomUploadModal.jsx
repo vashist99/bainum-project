@@ -178,47 +178,49 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
     return (
       <div className="modal modal-open">
         <div className="modal-backdrop bg-black/50" onClick={handleReject} aria-hidden="true" />
-        <div className="modal-box max-w-3xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto relative z-[100] bg-base-100">
-          <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-primary" />
+        <div className="modal-box max-w-3xl w-[95vw] sm:w-full max-h-[92vh] overflow-y-auto relative z-[100] bg-base-100 p-4 sm:p-6">
+          <h3 className="font-bold text-xl sm:text-2xl mb-3 sm:mb-4 flex items-center gap-2">
+            <FileText className="w-6 h-6 text-primary shrink-0" />
             Review Transcript
           </h3>
-          <div className="divider" />
+          <div className="divider my-2" />
           <div className="mb-4">
-            <label className="label">
+            <label className="label py-1">
               <span className="label-text font-semibold">Transcribed Text</span>
             </label>
-            <div className="bg-base-200 p-4 rounded-lg border border-base-300 max-h-96 overflow-y-auto">
+            <div className="bg-base-200 p-3 sm:p-4 rounded-lg border border-base-300 max-h-72 sm:max-h-96 overflow-y-auto">
               {segments.length > 0 ? (
                 <>
                   <RAGColorLegend />
-                  <p className="text-base whitespace-pre-wrap leading-relaxed">
+                  <p className="text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
                     {highlightRAGSegments(pendingTranscript, segments)}
                   </p>
                 </>
               ) : (
-                <p className="text-base whitespace-pre-wrap leading-relaxed">{pendingTranscript}</p>
+                <p className="text-sm sm:text-base whitespace-pre-wrap leading-relaxed">{pendingTranscript}</p>
               )}
             </div>
           </div>
           {pendingAssessment && (
             <div className="mb-4">
-              <label className="label">
+              <label className="label py-1">
                 <span className="label-text font-semibold">Results (WPM = classified words ÷ audio length)</span>
               </label>
-              <div className="stat bg-primary/10 border border-primary/30 rounded-lg p-4">
-                <div className="mb-3 text-sm text-base-content/70">
-                  <span className="font-medium">Audio length:</span>{' '}
-                  {pendingAssessment.durationSeconds != null
-                    ? `${Math.floor(pendingAssessment.durationSeconds / 60)} min ${Math.round(pendingAssessment.durationSeconds % 60)} sec`
-                    : '—'}
+              <div className="bg-primary/10 border border-primary/30 rounded-lg p-3 sm:p-4">
+                <div className="mb-3 text-xs sm:text-sm text-base-content/70 flex flex-wrap gap-x-3 gap-y-1">
+                  <span>
+                    <span className="font-medium">Audio length:</span>{' '}
+                    {pendingAssessment.durationSeconds != null
+                      ? `${Math.floor(pendingAssessment.durationSeconds / 60)} min ${Math.round(pendingAssessment.durationSeconds % 60)} sec`
+                      : '—'}
+                  </span>
                   {pendingAssessment.wordCount != null && (
-                    <span className="ml-3">
+                    <span>
                       <span className="font-medium">Total words:</span> {pendingAssessment.wordCount}
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3">
                   {[
                     { key: 'science', label: 'Science', color: 'text-blue-600' },
                     { key: 'social', label: 'Social', color: 'text-green-600' },
@@ -228,22 +230,23 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
                     const words = pendingAssessment.categoryWordCount?.[key] ?? 0;
                     const wpm = pendingAssessment.categoryWPM?.[key];
                     return (
-                      <div key={key} className={`text-sm ${color} border border-base-300 rounded p-2`}>
+                      <div key={key} className={`text-xs sm:text-sm ${color} border border-base-300 rounded p-2`}>
                         <div className="font-medium">{label}</div>
                         <div>{words} word{words !== 1 ? 's' : ''}</div>
-                        <div className="text-xs opacity-80">
+                        <div className="text-[10px] sm:text-xs opacity-80">
                           {wpm != null ? `${Math.round(wpm * 10) / 10} WPM` : '— WPM'}
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                <div className="stat-value text-xl text-primary border-t border-primary/20 pt-2">
+                <div className="text-lg sm:text-xl font-semibold text-primary border-t border-primary/20 pt-2">
                   {pendingAssessment.wordsPerMinute != null
                     ? `${Math.round((pendingAssessment.wordsPerMinute || 0) * 10) / 10} WPM`
-                    : 'N/A'} <span className="text-sm font-normal text-base-content/70">(overall)</span>
+                    : 'N/A'}{' '}
+                  <span className="text-xs sm:text-sm font-normal text-base-content/70">(overall)</span>
                 </div>
-                <div className="stat-desc text-sm text-base-content/70">
+                <div className="text-xs sm:text-sm text-base-content/70 break-words">
                   {pendingAssessment.wordsPerMinute != null
                     ? `${pendingAssessment.wordCount || 0} words ÷ ${pendingAssessment.durationSeconds ? `${(pendingAssessment.durationSeconds / 60).toFixed(1)} min` : '—'} = overall WPM`
                     : 'Duration not available from transcription'}
@@ -251,15 +254,15 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
               </div>
             </div>
           )}
-          <div className="alert alert-info mb-4">
-            <span className="text-sm">Please review the transcript above. Click Accept to save this assessment or Reject to cancel.</span>
+          <div className="alert alert-info mb-4 py-2 text-sm">
+            <span>Please review the transcript above. Click Accept to save this assessment or Reject to cancel.</span>
           </div>
-          <div className="modal-action">
-            <button onClick={handleReject} className="btn btn-ghost gap-2">
+          <div className="modal-action flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+            <button onClick={handleReject} className="btn btn-ghost gap-2 w-full sm:w-auto">
               <X className="w-4 h-4" />
               Reject
             </button>
-            <button onClick={handleAccept} className="btn btn-primary gap-2">
+            <button onClick={handleAccept} className="btn btn-primary gap-2 w-full sm:w-auto">
               <Check className="w-4 h-4" />
               Accept & Save
             </button>
@@ -271,21 +274,21 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
 
   return (
     <div className="modal modal-open">
-      <div className="modal-box max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
-        <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
-          <Mic className="w-6 h-6 text-primary" />
+      <div className="modal-box max-w-2xl w-[95vw] sm:w-full max-h-[92vh] overflow-y-auto p-4 sm:p-6">
+        <h3 className="font-bold text-xl sm:text-2xl mb-3 sm:mb-4 flex items-center gap-2">
+          <Mic className="w-6 h-6 text-primary shrink-0" />
           Upload Classroom Recording
         </h3>
-        <div className="divider" />
+        <div className="divider my-2" />
 
         {isAdmin && !isTeacherPreselected && (
           <>
-            <div className="form-control w-full mb-4">
-              <label className="label">
+            <div className="form-control w-full mb-3">
+              <label className="label py-1">
                 <span className="label-text font-semibold">Center</span>
               </label>
               <select
-                className="select select-bordered select-primary w-full"
+                className="select select-bordered select-primary w-full text-base"
                 value={selectedCenter}
                 onChange={(e) => setSelectedCenter(e.target.value)}
                 disabled={uploading}
@@ -298,12 +301,12 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
                 ))}
               </select>
             </div>
-            <div className="form-control w-full mb-4">
-              <label className="label">
+            <div className="form-control w-full mb-3">
+              <label className="label py-1">
                 <span className="label-text font-semibold">Teacher</span>
               </label>
               <select
-                className="select select-bordered select-primary w-full"
+                className="select select-bordered select-primary w-full text-base"
                 value={selectedTeacher}
                 onChange={(e) => setSelectedTeacher(e.target.value)}
                 disabled={uploading || !selectedCenter}
@@ -319,8 +322,8 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
           </>
         )}
 
-        <div className="form-control w-full mb-4">
-          <label className="label">
+        <div className="form-control w-full mb-3">
+          <label className="label py-1">
             <span className="label-text font-semibold">Select Audio File</span>
             <span className="label-text-alt">Max size: 25MB</span>
           </label>
@@ -328,19 +331,17 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
             type="file"
             accept="audio/*,.mp3,.wav,.m4a,.webm,.mp4,.mpeg,.mpga,.oga,.ogg"
             onChange={handleFileSelect}
-            className="file-input file-input-bordered file-input-primary w-full"
+            className="file-input file-input-bordered file-input-primary w-full text-base"
           />
           {audioFile && (
-            <label className="label">
-              <span className="label-text-alt text-success">
-                ✓ Selected: {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} MB)
-              </span>
-            </label>
+            <p className="text-xs sm:text-sm text-success mt-2 break-words">
+              ✓ Selected: {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} MB)
+            </p>
           )}
         </div>
 
-        <div className="form-control w-full mb-4">
-          <label className="label">
+        <div className="form-control w-full mb-3">
+          <label className="label py-1">
             <span className="label-text font-semibold flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               Recording Date
@@ -350,7 +351,7 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
             type="date"
             value={recordingDate}
             onChange={(e) => setRecordingDate(e.target.value)}
-            className="input input-bordered input-primary w-full"
+            className="input input-bordered input-primary w-full text-base"
             min={`${new Date().getFullYear()}-01-01`}
             max={new Date().toISOString().split("T")[0]}
             title="Recording date must be in the current year, up to today"
@@ -359,29 +360,31 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
 
         {uploading && (
           <div className="mb-4 overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5">
-            <div className="flex items-start gap-4 p-4">
-              <span className="loading loading-spinner loading-lg text-primary" />
-              <div className="flex-1">
+            <div className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4">
+              <span className="loading loading-spinner loading-lg text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
                 <p className="font-semibold mb-1">Processing your recording</p>
-                <p className="text-sm flex items-center gap-2">
-                  <span className="text-lg">{PROCESSING_MESSAGES[processingMessageIndex].icon}</span>
-                  {PROCESSING_MESSAGES[processingMessageIndex].text}
+                <p className="text-sm flex items-start gap-2">
+                  <span className="text-lg shrink-0">
+                    {PROCESSING_MESSAGES[processingMessageIndex].icon}
+                  </span>
+                  <span>{PROCESSING_MESSAGES[processingMessageIndex].text}</span>
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        <div className="modal-action">
+        <div className="modal-action flex-col-reverse sm:flex-row gap-2 sm:gap-3">
           <button
             onClick={() => (uploading ? handleCancelProcessing() : handleClose())}
-            className="btn btn-ghost"
+            className="btn btn-ghost w-full sm:w-auto"
           >
             {uploading ? "Cancel Processing" : "Cancel"}
           </button>
           <button
             onClick={handleUpload}
-            className="btn btn-primary gap-2"
+            className="btn btn-primary gap-2 w-full sm:w-auto"
             disabled={!audioFile || uploading || (isAdmin && !isTeacherPreselected && !selectedTeacher)}
           >
             {uploading ? (

@@ -143,6 +143,7 @@ const TeacherProfilePage = () => {
           assessments={assessments}
           viewMode={viewMode}
           title="Language Development Analysis - Year Overview"
+          contextSubtitle="At School"
           showWordScores
           cohortThresholdsByCategory={cohortThresholdsByCategory}
         />
@@ -167,7 +168,8 @@ const TeacherProfilePage = () => {
                           hour: "2-digit",
                           minute: "2-digit",
                         });
-                        return `=== Transcript from ${dateStr} ===\n${a.uploadedBy ? `Uploaded by: ${a.uploadedBy}\n` : ""}${a.transcript}\n\n`;
+                        const activityLine = a.activity ? `Activity: ${a.activity}\n` : "";
+                        return `=== Transcript from ${dateStr} ===\n${activityLine}${a.uploadedBy ? `Uploaded by: ${a.uploadedBy}\n` : ""}${a.transcript}\n\n`;
                       })
                       .join("\n");
                     const blob = new Blob([text], { type: "text/plain" });
@@ -204,16 +206,32 @@ const TeacherProfilePage = () => {
                       <div key={assessment._id} className="card bg-base-200 border border-base-300">
                         <div className="card-body p-4">
                           <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-semibold flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
-                              {new Date(assessment.date).toLocaleDateString("en-US", {
-                                month: "long",
-                                day: "numeric",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </h3>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold flex items-center gap-2 flex-wrap">
+                                <Calendar className="w-4 h-4 shrink-0" />
+                                <span>
+                                  {new Date(assessment.date).toLocaleDateString("en-US", {
+                                    month: "long",
+                                    day: "numeric",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                                {assessment.activity && (
+                                  <span
+                                    className="badge badge-outline badge-primary badge-sm font-normal"
+                                    title={
+                                      assessment.activityContext === "home"
+                                        ? "Activity recorded at home"
+                                        : "Activity recorded at school"
+                                    }
+                                  >
+                                    {assessment.activity}
+                                  </span>
+                                )}
+                              </h3>
+                            </div>
                             <button
                               onClick={() => handleDeleteTeacherAssessment(assessment._id)}
                               className="btn btn-ghost btn-sm btn-circle text-error"

@@ -5,6 +5,9 @@ import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 
+/** Dev StrictMode mounts twice; cache verify by token to avoid duplicate requests/logs. */
+const invitationVerifyPromiseCache = new Map();
+
 const ParentRegisterPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -26,6 +29,8 @@ const ParentRegisterPage = () => {
 
   // Verify invitation token on mount
   useEffect(() => {
+    let cancelled = false;
+
     const verifyInvitation = async () => {
       if (!token) {
         setVerifying(false);
@@ -35,28 +40,40 @@ const ParentRegisterPage = () => {
       }
 
       try {
-        const response = await axios.get(`/api/invitations/verify/${token}`);
-        if (response.data.valid) {
+        const cached = invitationVerifyPromiseCache.get(token);
+        const verifyPromise =
+          cached || axios.get(`/api/invitations/verify/${token}`).then((res) => res.data);
+        if (!cached) invitationVerifyPromiseCache.set(token, verifyPromise);
+
+        const data = await verifyPromise;
+        if (cancelled) return;
+
+        if (data.valid) {
           setInvitationValid(true);
-          setInvitationData(response.data.invitation);
-          setFormData(prev => ({
+          setInvitationData(data.invitation);
+          setFormData((prev) => ({
             ...prev,
-            email: response.data.invitation.email
+            email: data.invitation.email,
           }));
         } else {
           setInvitationValid(false);
           toast.error("Invalid or expired invitation");
         }
       } catch (error) {
+        if (cancelled) return;
         setInvitationValid(false);
+        invitationVerifyPromiseCache.delete(token);
         const errorMessage = error.response?.data?.message || "Invalid invitation";
         toast.error(errorMessage);
       } finally {
-        setVerifying(false);
+        if (!cancelled) setVerifying(false);
       }
     };
 
     verifyInvitation();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   const handleInputChange = (e) => {
@@ -121,9 +138,17 @@ const ParentRegisterPage = () => {
       // Auto-login the parent
       login(response.data.user);
 
-      // Navigate to child's data page
-      if (response.data.user.childId) {
-        navigate(`/data/child/${response.data.user.childId}`);
+      // Invited child's page (response.data.user is the JWT string, not a parsed object)
+      const invitedChildId =
+        invitationData?.childIds?.[0] != null
+          ? invitationData.childIds[0]
+          : invitationData?.childId
+            ? typeof invitationData.childId === "object"
+              ? invitationData.childId._id || invitationData.childId
+              : invitationData.childId
+            : null;
+      if (invitedChildId) {
+        navigate(`/data/child/${invitedChildId}`);
       } else {
         navigate("/home");
       }
@@ -190,9 +215,20 @@ const ParentRegisterPage = () => {
               Create Parent Account
             </h2>
             <p className="text-base-content/60 mt-2">
-              {invitationData?.childName && (
-                <>You've been invited to view <strong>{invitationData.childName}</strong>'s progress</>
-              )}
+              {Array.isArray(invitationData?.children) && invitationData.children.length > 1 ? (
+                <>
+                  You&apos;ve been invited to view progress for:{" "}
+                  <strong>
+                    {invitationData.children.map((c) => c.name).filter(Boolean).join(", ")}
+                  </strong>
+                </>
+              ) : (invitationData?.childName || invitationData?.children?.[0]?.name) ? (
+                <>
+                  You&apos;ve been invited to view{" "}
+                  <strong>{invitationData.childName || invitationData.children[0].name}</strong>
+                  &apos;s progress
+                </>
+              ) : null}
             </p>
           </div>
 

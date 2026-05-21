@@ -29,7 +29,7 @@ const App = () => {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/home" element={
-        <ProtectedRoute>
+        <ProtectedRoute skipParentHomeRedirect>
           <HomePage />
         </ProtectedRoute>
       } />
@@ -78,7 +78,7 @@ const App = () => {
         </ProtectedRoute>
       } />
       <Route path="/teachers/:username" element={
-        <ProtectedRoute excludeRoles={['parent']}>
+        <ProtectedRoute skipParentHomeRedirect>
           <TeacherDataDetailPage />
         </ProtectedRoute>
       } />

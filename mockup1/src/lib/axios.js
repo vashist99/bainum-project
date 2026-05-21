@@ -80,11 +80,10 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    // On 401 or 403, session may be expired (JWT invalid/expired) - clear and redirect to login
+    // Only 401 means invalid/expired session. 403 is authorization denied — keep user logged in.
     const status = error.response?.status;
-    if ((status === 401 || status === 403) && !error.config?.url?.includes('login')) {
+    if (status === 401 && !error.config?.url?.includes('login')) {
       localStorage.removeItem('user');
-      // Redirect to login with a flag so the page can show a message
       window.location.href = '/?session_expired=1';
       return Promise.reject(error);
     }

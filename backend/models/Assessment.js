@@ -18,6 +18,12 @@ const assessmentSchema = new mongoose.Schema({
         type: String, 
         required: false 
     },
+    // Transcript text is retained for one month, while WPM metrics are kept.
+    transcriptExpiresAt: {
+        type: Date,
+        required: false,
+        index: true,
+    },
     scienceTalk: { 
         type: Number, 
         default: 0,
@@ -67,9 +73,21 @@ const assessmentSchema = new mongoose.Schema({
         enum: ['keyword-only', 'rag'],
         default: 'keyword-only'
     },
-    uploadedBy: { 
-        type: String, 
-        required: false 
+    uploadedBy: {
+        type: String,
+        required: false
+    },
+    /** Recorded activity context (e.g. "Mealtime", "Reading", or a validated custom activity). */
+    activity: {
+        type: String,
+        required: false,
+        trim: true
+    },
+    /** Where the activity took place — set by the recording controller. */
+    activityContext: {
+        type: String,
+        enum: ['school', 'home'],
+        required: false
     },
     wordCount: { type: Number, default: null },
     durationSeconds: { type: Number, default: null },

@@ -12,7 +12,8 @@
     "test": "playwright test",
     "test:e2e": "playwright test tests/e2e",
     "test:ui": "playwright test --ui",
-    "test:headed": "playwright test --headed"
+    "test:headed": "playwright test --headed",
+    "test:unit": "node --test tests/unit/*.test.js"
   },
   "dependencies": {
     "axios": "^1.12.2",

@@ -1,26 +1,30 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
-import { ArrowLeft, User, Mail, Building2, FileText, Calendar, Download, Upload, Trash2 } from "lucide-react";
+import { ArrowLeft, User, Mail, Building2, FileText, Calendar, Download, Upload, Trash2, Shield } from "lucide-react";
 import axios from "../lib/axios";
 import { LanguageDevelopmentCharts } from "../components/LanguageDevelopmentCharts";
 import { highlightRAGSegments, getSegmentsForHighlighting } from "../utils/ragHighlightSegments.js";
 import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
+import { getPrimaryChildId } from "../utils/parentChildren.js";
 import ClassroomUploadModal from "../components/ClassroomUploadModal";
 
 const TeacherDataDetailPage = () => {
   const { username: usernameOrId } = useParams();
   const teacherId = usernameOrId;
   const navigate = useNavigate();
-  const { user, isAdmin, isTeacher } = useAuth();
+  const { user, isAdmin, isTeacher, isParent } = useAuth();
   const [teacher, setTeacher] = useState(null);
   const [assessments, setAssessments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("dotmatrix");
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [cohortThresholdsByCategory, setCohortThresholdsByCategory] = useState(null);
+  const [parentAccessDenied, setParentAccessDenied] = useState(false);
+  const [teacherStub, setTeacherStub] = useState(null);
+  const [requestingAccess, setRequestingAccess] = useState(false);
 
   const isViewingOwnPage = isTeacher() && teacher && (String(user?.id) === String(teacher._id) || user?.username === (teacher.username || ''));
 
@@ -56,12 +60,28 @@ const TeacherDataDetailPage = () => {
       if (!teacherId) return;
       try {
         setLoading(true);
-        const teacherRes = await axios.get(`/api/teachers/${teacherId}`).catch(() => ({ data: { teacher: null } }));
-        const teacher = teacherRes.data?.teacher || null;
-        setTeacher(teacher);
-        if (teacher) {
+        setParentAccessDenied(false);
+        setTeacherStub(null);
+        let teacherRes;
+        try {
+          teacherRes = await axios.get(`/api/teachers/${teacherId}`);
+        } catch (err) {
+          const d = err.response?.data;
+          if (err.response?.status === 403 && d?.code === "PARENT_TEACHER_ACCESS_DENIED") {
+            setParentAccessDenied(true);
+            setTeacherStub(d.teacher || null);
+            setTeacher(null);
+            setAssessments([]);
+            return;
+          }
+          setTeacher(null);
+          throw err;
+        }
+        const t = teacherRes.data?.teacher || null;
+        setTeacher(t);
+        if (t) {
           const [assessmentsRes, cohortRes] = await Promise.all([
-            axios.get(`/api/assessments/teacher/${teacher._id}`).catch(() => ({ data: { assessments: [] } })),
+            axios.get(`/api/assessments/teacher/${t._id}`).catch(() => ({ data: { assessments: [] } })),
             axios.get(`/api/assessments/cohort-stats/teachers`).catch(() => ({ data: { cohortStats: null } })),
           ]);
           setAssessments(assessmentsRes.data?.assessments || []);
@@ -70,12 +90,34 @@ const TeacherDataDetailPage = () => {
       } catch (error) {
         console.error("Error fetching teacher data:", error);
         toast.error("Failed to load teacher data");
+        setTeacher(null);
       } finally {
         setLoading(false);
       }
     };
     fetchData();
   }, [teacherId]);
+
+  const handleRequestTeacherAccess = async () => {
+    const tid = teacherStub?._id;
+    const cid = getPrimaryChildId(user);
+    if (!tid || !cid) {
+      toast.error("Missing teacher or child");
+      return;
+    }
+    setRequestingAccess(true);
+    try {
+      await axios.post("/api/access/request-teacher-view", {
+        teacherId: tid,
+        childId: cid,
+      });
+      toast.success("Request sent. The teacher must approve before you can view their data.");
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Could not send request");
+    } finally {
+      setRequestingAccess(false);
+    }
+  };
 
   const transcriptsWithContent = assessments.filter((a) => a.transcript?.trim());
 
@@ -86,6 +128,37 @@ const TeacherDataDetailPage = () => {
         <div className="container mx-auto p-6">
           <div className="flex justify-center items-center h-64">
             <span className="loading loading-spinner loading-lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isParent() && parentAccessDenied && teacherStub) {
+    return (
+      <div className="min-h-screen bg-base-200">
+        <Navbar />
+        <div className="container mx-auto p-6 max-w-lg">
+          <button type="button" onClick={() => navigate(`/data/child/${getPrimaryChildId(user)}`)} className="btn btn-ghost btn-circle mb-4">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="card bg-base-100 shadow-xl">
+            <div className="card-body">
+              <h2 className="card-title">Access: {teacherStub.name || "Teacher"}</h2>
+              <p className="text-base-content/80">
+                You don&apos;t have permission to view this teacher&apos;s classroom data yet. Send a request so they
+                can approve access for your child.
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary gap-2 mt-2"
+                disabled={requestingAccess}
+                onClick={handleRequestTeacherAccess}
+              >
+                <Shield className="w-4 h-4" />
+                {requestingAccess ? "Sending…" : "Request access"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -175,6 +248,7 @@ const TeacherDataDetailPage = () => {
           assessments={assessments}
           viewMode={viewMode}
           title="Language Development Analysis - Year Overview"
+          contextSubtitle="At School"
           cohortThresholdsByCategory={cohortThresholdsByCategory}
           showWordScores
         />
@@ -199,7 +273,8 @@ const TeacherDataDetailPage = () => {
                           hour: "2-digit",
                           minute: "2-digit",
                         });
-                        return `=== Transcript from ${dateStr} ===\n${a.uploadedBy ? `Uploaded by: ${a.uploadedBy}\n` : ""}${a.transcript}\n\n`;
+                        const activityLine = a.activity ? `Activity: ${a.activity}\n` : "";
+                        return `=== Transcript from ${dateStr} ===\n${activityLine}${a.uploadedBy ? `Uploaded by: ${a.uploadedBy}\n` : ""}${a.transcript}\n\n`;
                       })
                       .join("\n");
                     const blob = new Blob([text], { type: "text/plain" });
@@ -236,16 +311,32 @@ const TeacherDataDetailPage = () => {
                       <div key={assessment._id} className="card bg-base-200 border border-base-300">
                         <div className="card-body p-4">
                           <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-semibold flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
-                              {new Date(assessment.date).toLocaleDateString("en-US", {
-                                month: "long",
-                                day: "numeric",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </h3>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold flex items-center gap-2 flex-wrap">
+                                <Calendar className="w-4 h-4 shrink-0" />
+                                <span>
+                                  {new Date(assessment.date).toLocaleDateString("en-US", {
+                                    month: "long",
+                                    day: "numeric",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                                {assessment.activity && (
+                                  <span
+                                    className="badge badge-outline badge-primary badge-sm font-normal"
+                                    title={
+                                      assessment.activityContext === "home"
+                                        ? "Activity recorded at home"
+                                        : "Activity recorded at school"
+                                    }
+                                  >
+                                    {assessment.activity}
+                                  </span>
+                                )}
+                              </h3>
+                            </div>
                             <button
                               onClick={() => handleDeleteTeacherAssessment(assessment._id)}
                               className="btn btn-ghost btn-sm btn-circle text-error"

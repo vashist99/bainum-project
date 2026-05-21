@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
-import { Plus, Users, ChevronRight, UserPlus, Mail, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, ChevronRight, UserPlus, Mail, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown, CheckSquare } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
+import { getPrimaryChildId } from "../utils/parentChildren.js";
 
 const DataPage = () => {
   const navigate = useNavigate();
@@ -12,21 +13,55 @@ const DataPage = () => {
 
   // Redirect parents to their child's page
   useEffect(() => {
-    if (isParent() && user?.childId) {
-      navigate(`/data/child/${user.childId}`, { replace: true });
+    const primary = getPrimaryChildId(user);
+    if (isParent() && primary) {
+      navigate(`/data/child/${primary}`, { replace: true });
     }
   }, [isParent, user, navigate]);
+
+  const [pendingParentAccess, setPendingParentAccess] = useState([]);
+
+  useEffect(() => {
+    if (!isTeacher() || !user) return;
+    axios
+      .get("/api/access/pending-for-teacher")
+      .then((res) => setPendingParentAccess(res.data?.pending || []))
+      .catch(() => setPendingParentAccess([]));
+  }, [isTeacher, user]);
+
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [teachers, setTeachers] = useState([]);
   const [children, setChildren] = useState([]);
   const [filteredChildren, setFilteredChildren] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [selectedChildForInvite, setSelectedChildForInvite] = useState(null);
+  const [inviteModalChildren, setInviteModalChildren] = useState([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [sendingInvite, setSendingInvite] = useState(false);
+  /** Child ids selected in the table for bulk invite (checkboxes) */
+  const [selectedChildIdsForBulk, setSelectedChildIdsForBulk] = useState(() => new Set());
   const [sortBy, setSortBy] = useState(null); // 'age' | 'teacher' | 'language'
   const [sortAsc, setSortAsc] = useState(true);
+  /** Child ids that already have a parent invitation sent (any status) */
+  const [invitedChildIds, setInvitedChildIds] = useState(() => new Set());
+
+  useEffect(() => {
+    if (!isAdmin() && !isTeacher()) return;
+    axios
+      .get("/api/invitations/list")
+      .then((res) => {
+        const next = new Set();
+        (res.data?.invitations || []).forEach((inv) => {
+          if (Array.isArray(inv?.childIds) && inv.childIds.length) {
+            inv.childIds.forEach((id) => id != null && next.add(String(id)));
+          } else if (inv?.childId != null) {
+            next.add(String(inv.childId));
+          }
+        });
+        setInvitedChildIds(next);
+      })
+      .catch(() => {});
+  }, [isAdmin, isTeacher]);
 
   // Load teachers and children from database
   useEffect(() => {
@@ -84,8 +119,65 @@ const DataPage = () => {
     }
   }, [selectedTeacher, children, isAdmin]);
 
+  useEffect(() => {
+    setSelectedChildIdsForBulk((prev) => {
+      const allowed = new Set(
+        filteredChildren.map((c) => String(c._id || c.id || ""))
+      );
+      const next = new Set();
+      prev.forEach((id) => {
+        if (allowed.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [filteredChildren]);
+
   const handleTeacherChange = (e) => {
     setSelectedTeacher(e.target.value);
+  };
+
+  const childDocId = (child) => String(child?._id || child?.id || "");
+  const hasLinkedParentAccount = (child) =>
+    Array.isArray(child?.parents) && child.parents.length > 0;
+
+  const isChildEligibleForInvite = (child) => {
+    const cid = childDocId(child);
+    return cid && !invitedChildIds.has(cid) && !hasLinkedParentAccount(child);
+  };
+
+  const toggleBulkChild = (child) => {
+    const cid = childDocId(child);
+    if (!cid || !isChildEligibleForInvite(child)) return;
+    setSelectedChildIdsForBulk((prev) => {
+      const next = new Set(prev);
+      if (next.has(cid)) next.delete(cid);
+      else next.add(cid);
+      return next;
+    });
+  };
+
+  const processInviteResponse = async (response, label) => {
+    if (response.data.warning || response.data.invitation?.invitationLink) {
+      const link =
+        response.data.invitation?.invitationLink ||
+        response.data.invitationLink ||
+        `${window.location.origin}/parent/register?token=${response.data.invitation?.token}`;
+
+      const errorMsg = response.data.emailError ? `\n\nError: ${response.data.emailError}` : "";
+      toast.error(`Invitation created but email failed to send (${label}).${errorMsg}`, {
+        duration: 15000,
+      });
+
+      await new Promise((r) => setTimeout(r, 300));
+      const message = `Email not configured. Please copy and share this invitation link with the parent (${label}):${errorMsg}\n\n${link}`;
+      try {
+        await navigator.clipboard.writeText(link);
+        toast.success(`Invitation link copied (${label})`);
+        alert(message);
+      } catch {
+        prompt(message, link);
+      }
+    }
   };
 
   const handleSendInvitation = async () => {
@@ -94,58 +186,64 @@ const DataPage = () => {
       return;
     }
 
-    if (!selectedChildForInvite) {
-      toast.error("No child selected");
+    if (!inviteModalChildren.length) {
+      toast.error("No children selected");
       return;
     }
+
+    const ids = inviteModalChildren.map((ch) => ch._id || ch.id).filter(Boolean);
+    const label = inviteModalChildren.map((c) => c.name || "child").join(", ");
 
     setSendingInvite(true);
     try {
       const response = await axios.post("/api/invitations/send", {
-        email: inviteEmail,
-        childId: selectedChildForInvite._id || selectedChildForInvite.id,
+        email: inviteEmail.trim(),
+        childIds: ids,
         userId: user?.id,
         userRole: user?.role,
-        userName: user?.name
+        userName: user?.name,
       });
 
-      // Check if email failed but invitation was created
-      if (response.data.warning || response.data.invitation?.invitationLink) {
-        const link = response.data.invitation?.invitationLink || 
-          response.data.invitationLink ||
-          `${window.location.origin}/parent/register?token=${response.data.invitation?.token}`;
-        
-        const errorMsg = response.data.emailError ? `\n\nError: ${response.data.emailError}` : '';
-        toast.error(`Invitation created but email failed to send.${errorMsg}`, {
-          duration: 15000,
-        });
-        
-        // Show the link in a more visible way
-        setTimeout(() => {
-          const message = `Email not configured. Please copy and share this invitation link with the parent:${errorMsg}\n\n${link}`;
-          navigator.clipboard.writeText(link).then(() => {
-            toast.success("Invitation link copied to clipboard!");
-            alert(message);
-          }).catch(() => {
-            prompt(message, link);
-          });
-        }, 500);
-      } else {
-        toast.success("Invitation sent successfully!");
+      await processInviteResponse(response, label);
+
+      if (!response.data.warning && !response.data.invitation?.invitationLink) {
+        if (response.data.mergedWithPending || response.data.linkedExistingParent) {
+          toast.success(
+            response.data.message ||
+              "Parent contact email saved on each child; no duplicate invitation email was sent."
+          );
+        } else {
+          toast.success(
+            ids.length > 1
+              ? `One invitation sent to ${inviteEmail.trim()} for ${label}`
+              : "Invitation sent successfully!"
+          );
+        }
       }
-      
+
+      setInvitedChildIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.add(String(id)));
+        return next;
+      });
+
       setShowInviteModal(false);
       setInviteEmail("");
-      setSelectedChildForInvite(null);
+      setInviteModalChildren([]);
+      setSelectedChildIdsForBulk((prev) => {
+        const n = new Set(prev);
+        ids.forEach((id) => n.delete(String(id)));
+        return n;
+      });
     } catch (error) {
       const errorMessage = error.response?.data?.message || "Failed to send invitation";
       toast.error(errorMessage);
-      
-      // If invitation was created but email failed, show the link
+
       if (error.response?.data?.invitation?.invitationLink || error.response?.data?.invitationLink) {
-        const link = error.response.data.invitation?.invitationLink || error.response.data.invitationLink;
+        const link =
+          error.response.data.invitation?.invitationLink || error.response.data.invitationLink;
         setTimeout(() => {
-          prompt("Invitation created but email failed. Share this link manually:", link);
+          prompt(`Invitation created but email failed. Share this link manually:`, link);
         }, 500);
       }
     } finally {
@@ -154,8 +252,18 @@ const DataPage = () => {
   };
 
   const openInviteModal = (child) => {
-    setSelectedChildForInvite(child);
+    const cid = childDocId(child);
+    if (!cid || invitedChildIds.has(cid)) {
+      return;
+    }
+    setInviteModalChildren([child]);
     setShowInviteModal(true);
+  };
+
+  const closeInviteModal = () => {
+    setShowInviteModal(false);
+    setInviteEmail("");
+    setInviteModalChildren([]);
   };
 
   const getAgeInMonths = (dateOfBirth) => {
@@ -212,6 +320,41 @@ const DataPage = () => {
     });
   })();
 
+  const bulkEligibleChildren = sortedChildren.filter(isChildEligibleForInvite);
+  const allBulkEligibleSelected =
+    bulkEligibleChildren.length > 0 &&
+    bulkEligibleChildren.every((c) => selectedChildIdsForBulk.has(childDocId(c)));
+
+  const toggleSelectAllBulkEligible = () => {
+    if (allBulkEligibleSelected) {
+      setSelectedChildIdsForBulk(new Set());
+      return;
+    }
+    setSelectedChildIdsForBulk(new Set(bulkEligibleChildren.map((c) => childDocId(c))));
+  };
+
+  const openBulkInviteFromSelection = () => {
+    const selected = sortedChildren.filter(
+      (c) => isChildEligibleForInvite(c) && selectedChildIdsForBulk.has(childDocId(c))
+    );
+    if (selected.length === 0) {
+      toast.error("Select at least one child who has not been invited yet");
+      return;
+    }
+    setInviteModalChildren(selected);
+    setShowInviteModal(true);
+  };
+
+  const handleApproveParentAccess = async (grantId) => {
+    try {
+      await axios.patch(`/api/access/grants/${grantId}/approve`);
+      toast.success("Access approved");
+      setPendingParentAccess((p) => p.filter((g) => g._id !== grantId));
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Could not approve");
+    }
+  };
+
   const handleDeleteChild = async (childId) => {
     if (window.confirm("Are you sure you want to delete this child? This action cannot be undone.")) {
       try {
@@ -243,6 +386,30 @@ const DataPage = () => {
             <p>Filtered Children: {filteredChildren.length}</p>
           </div>
         </div> */}
+
+        {isTeacher() && pendingParentAccess.length > 0 && (
+          <div className="alert alert-info mb-4">
+            <div className="w-full">
+              <h3 className="font-bold">Parent requests to view your classroom data</h3>
+              <ul className="mt-2 space-y-2">
+                {pendingParentAccess.map((g) => (
+                  <li key={g._id} className="flex flex-wrap items-center justify-between gap-2 border border-base-300 rounded-lg p-2">
+                    <span className="text-sm">
+                      {(g.parentId?.name || "Parent") + " — child: " + (g.childId?.name || "—")}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => handleApproveParentAccess(g._id)}
+                    >
+                      Approve
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -309,9 +476,28 @@ const DataPage = () => {
         {(selectedTeacher || (isAdmin() && children.length > 0)) && (
           <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
-              <h2 className="card-title mb-4">
-                {selectedTeacher ? `Children under ${selectedTeacher}` : "All Children"}
-              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                <h2 className="card-title">
+                  {selectedTeacher ? `Children under ${selectedTeacher}` : "All Children"}
+                </h2>
+                {bulkEligibleChildren.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm gap-2 shrink-0"
+                    onClick={openBulkInviteFromSelection}
+                    disabled={selectedChildIdsForBulk.size === 0}
+                    title={
+                      selectedChildIdsForBulk.size === 0
+                        ? "Select one or more children using the checkboxes"
+                        : "Send one parent invitation email covering all selected children"
+                    }
+                  >
+                    <Mail className="w-4 h-4" />
+                    Invite parent for selected
+                    {selectedChildIdsForBulk.size > 0 ? ` (${selectedChildIdsForBulk.size})` : ""}
+                  </button>
+                )}
+              </div>
               {/* Mobile: Card layout */}
               <div className="block md:hidden space-y-3">
                 {filteredChildren.length === 0 ? (
@@ -326,7 +512,25 @@ const DataPage = () => {
                     >
                       <div className="card-body p-4">
                         <div className="flex justify-between items-start gap-2">
-                          <div>
+                          <label
+                            className={`flex items-start gap-2 pt-0.5 shrink-0 ${
+                              isChildEligibleForInvite(child) ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-primary checkbox-sm mt-0.5"
+                              checked={selectedChildIdsForBulk.has(childDocId(child))}
+                              onChange={() => toggleBulkChild(child)}
+                              disabled={!isChildEligibleForInvite(child)}
+                              title={
+                                isChildEligibleForInvite(child)
+                                  ? "Include in bulk parent invite"
+                                  : "Invitation already sent for this child"
+                              }
+                            />
+                          </label>
+                          <div className="min-w-0 flex-1">
                             <h3 className="font-semibold text-base flex items-center gap-1">
                               <span className="text-base-content/60">#{index + 1}</span>
                               <button
@@ -362,13 +566,24 @@ const DataPage = () => {
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
-                            <button
-                              onClick={() => openInviteModal(child)}
-                              className="btn btn-primary btn-xs gap-1"
-                            >
-                              <Mail className="w-3 h-3" />
-                              Invite
-                            </button>
+                            {hasLinkedParentAccount(child) ? (
+                              <span className="btn btn-ghost btn-xs gap-1 no-animation pointer-events-none opacity-80 border border-base-300">
+                                Parent linked
+                              </span>
+                            ) : invitedChildIds.has(String(child._id || child.id)) ? (
+                              <span className="btn btn-ghost btn-xs gap-1 no-animation pointer-events-none opacity-80 border border-base-300">
+                                Invited
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openInviteModal(child)}
+                                className="btn btn-primary btn-xs gap-1"
+                              >
+                                <Mail className="w-3 h-3" />
+                                Invite
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -381,6 +596,22 @@ const DataPage = () => {
                 <table className="table table-zebra">
                   <thead>
                     <tr>
+                      <th className="w-12">
+                        {bulkEligibleChildren.length > 0 ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-xs px-1 min-h-0 h-8"
+                            onClick={toggleSelectAllBulkEligible}
+                            title={allBulkEligibleSelected ? "Clear selection" : "Select all not yet invited"}
+                          >
+                            <CheckSquare className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <span className="text-base-content/40 text-xs" title="No children available for invite">
+                            —
+                          </span>
+                        )}
+                      </th>
                       <th>#</th>
                       <th>Name</th>
                       <th>
@@ -420,7 +651,7 @@ const DataPage = () => {
                     {filteredChildren.length === 0 ? (
                       <tr>
                         <td
-                          colSpan="6"
+                          colSpan="7"
                           className="text-center text-base-content/60"
                         >
                           No children found for this teacher.
@@ -429,6 +660,21 @@ const DataPage = () => {
                     ) : (
                       sortedChildren.map((child, index) => (
                         <tr key={child._id || child.id} className="hover">
+                          <td className="align-middle w-12">
+                            {isChildEligibleForInvite(child) ? (
+                              <input
+                                type="checkbox"
+                                className="checkbox checkbox-primary checkbox-sm"
+                                checked={selectedChildIdsForBulk.has(childDocId(child))}
+                                onChange={() => toggleBulkChild(child)}
+                                title="Include in bulk parent invite"
+                              />
+                            ) : (
+                              <span className="inline-block w-6 text-center text-base-content/30" title="Already invited">
+                                —
+                              </span>
+                            )}
+                          </td>
                           <td className="align-middle">{index + 1}</td>
                           <td className="align-middle">
                             <button
@@ -465,14 +711,31 @@ const DataPage = () => {
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
-                              <button
-                                onClick={() => openInviteModal(child)}
-                                className="btn btn-primary btn-xs gap-1"
-                                title="Send invitation to parent"
-                              >
-                                <Mail className="w-3 h-3" />
-                                Invite
-                              </button>
+                              {hasLinkedParentAccount(child) ? (
+                                <span
+                                  className="btn btn-ghost btn-xs gap-1 no-animation pointer-events-none opacity-80 cursor-default border border-base-300"
+                                  title="This child already has a linked parent account"
+                                >
+                                  Parent linked
+                                </span>
+                              ) : invitedChildIds.has(String(child._id || child.id)) ? (
+                                <span
+                                  className="btn btn-ghost btn-xs gap-1 no-animation pointer-events-none opacity-80 cursor-default border border-base-300"
+                                  title="Invitation already sent for this child"
+                                >
+                                  Invited
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openInviteModal(child)}
+                                  className="btn btn-primary btn-xs gap-1"
+                                  title="Send invitation to parent"
+                                >
+                                  <Mail className="w-3 h-3" />
+                                  Invite
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -504,9 +767,9 @@ const DataPage = () => {
         )}
 
         {/* Invitation Modal */}
-        {showInviteModal && selectedChildForInvite && (
+        {showInviteModal && inviteModalChildren.length > 0 && (
           <div className="modal modal-open">
-            <div className="modal-box w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
+            <div className="modal-box w-[95vw] sm:w-full max-w-lg max-h-[90vh] overflow-y-auto">
               <h3 className="font-bold text-2xl mb-4 flex items-center gap-2">
                 <Mail className="w-6 h-6 text-primary" />
                 Send Parent Invitation
@@ -515,11 +778,29 @@ const DataPage = () => {
               <div className="divider"></div>
 
               <div className="mb-4">
-                <p className="text-sm text-base-content/70 mb-2">
-                  Sending invitation for: <strong>{selectedChildForInvite.name}</strong>
-                </p>
-                <p className="text-xs text-base-content/60">
-                  The parent will receive an email with a link to create their account and view their child's data.
+                {inviteModalChildren.length === 1 ? (
+                  <p className="text-sm text-base-content/70 mb-2">
+                    Sending invitation for: <strong>{inviteModalChildren[0].name}</strong>
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm text-base-content/70 mb-2">
+                      One invitation will cover {inviteModalChildren.length} children:
+                    </p>
+                    <ul className="list-disc list-inside text-sm space-y-1 max-h-40 overflow-y-auto border border-base-300 rounded-lg p-3 bg-base-200">
+                      {inviteModalChildren.map((c) => (
+                        <li key={childDocId(c)}>
+                          <strong>{c.name}</strong>
+                          {c.leadTeacher ? (
+                            <span className="text-base-content/60"> — {c.leadTeacher}</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                <p className="text-xs text-base-content/60 mt-3">
+                  The parent receives one email with a link to register and link all listed children to their account.
                 </p>
               </div>
 
@@ -539,17 +820,15 @@ const DataPage = () => {
 
               <div className="modal-action">
                 <button
-                  onClick={() => {
-                    setShowInviteModal(false);
-                    setInviteEmail("");
-                    setSelectedChildForInvite(null);
-                  }}
+                  type="button"
+                  onClick={() => !sendingInvite && closeInviteModal()}
                   className="btn btn-ghost"
                   disabled={sendingInvite}
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleSendInvitation}
                   className="btn btn-primary gap-2"
                   disabled={sendingInvite || !inviteEmail.trim()}
@@ -562,13 +841,19 @@ const DataPage = () => {
                   ) : (
                     <>
                       <Mail className="w-4 h-4" />
-                      Send Invitation
+                      {inviteModalChildren.length > 1
+                        ? "Send combined invitation"
+                        : "Send invitation"}
                     </>
                   )}
                 </button>
               </div>
             </div>
-            <div className="modal-backdrop" onClick={() => !sendingInvite && setShowInviteModal(false)}></div>
+            <div
+              className="modal-backdrop"
+              onClick={() => !sendingInvite && closeInviteModal()}
+              aria-hidden="true"
+            />
           </div>
         )}
       </div>
