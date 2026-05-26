@@ -145,7 +145,12 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
         payload.teacherId = payload.teacherId.toString?.() || payload.teacherId;
       }
       const response = await axios.post("/api/assessments/teacher/accept", payload);
-      toast.success("Assessment saved successfully!");
+      const childCount = response.data?.childCount ?? 0;
+      toast.success(
+        childCount > 0
+          ? `Assessment saved for the teacher and ${childCount} child${childCount === 1 ? "" : "ren"}.`
+          : "Assessment saved successfully!"
+      );
       setShowTranscriptModal(false);
       setPendingTranscript(null);
       setPendingAssessment(null);
