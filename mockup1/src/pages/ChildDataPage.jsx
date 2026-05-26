@@ -879,8 +879,10 @@ const ChildDataPage = () => {
           </div>
         </div>
 
-        {/* Transcripts Section - Admin + Parent */}
-        {(isAdmin() || isParent()) && (
+        {/* Transcripts Section - visible to anyone the backend already lets fetch /api/assessments/child/:id.
+            That's: admins (always), parents (their own children), and teachers (with active AccessGrant).
+            Hiding it from teachers meant their own recordings never surfaced on the child's page. */}
+        {(isAdmin() || isParent() || (isTeacher() && !teacherAccessDenied)) && (
           <div className="card bg-base-100 shadow-xl mb-6">
             <div className="card-body">
               <div className="flex items-center justify-between mb-4">
@@ -892,7 +894,7 @@ const ChildDataPage = () => {
                   <div className="text-sm text-base-content/60">
                     {allAssessments.filter(a => a.transcript && a.transcript.trim()).length} transcript{allAssessments.filter(a => a.transcript && a.transcript.trim()).length !== 1 ? 's' : ''} available
                   </div>
-                  {isAdmin() && allAssessments.filter(a => a.transcript && a.transcript.trim()).length > 0 && (
+                  {allAssessments.filter(a => a.transcript && a.transcript.trim()).length > 0 && (
                     <button
                       onClick={() => {
                         // Combine all transcripts into one file
