@@ -300,9 +300,7 @@ export const sendInvitationEmail = async (email, childName, invitationToken, inv
             sendSmtpEmail.to = [{ email: email }];
             
             // Disable link tracking to prevent redirect issues with invitation links
-            sendSmtpEmail.tags = ["invitation-email"];
-            sendSmtpEmail.trackOpens = false;
-            sendSmtpEmail.trackClicks = false;
+            // Note: Brevo API might not support these exact properties, using minimal approach
             
             const data = await brevoApi.sendTransacEmail(sendSmtpEmail);
             console.log('Email sent successfully via Brevo API:', {
