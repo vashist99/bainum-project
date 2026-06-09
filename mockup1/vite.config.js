@@ -12,4 +12,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router'],
+          charts: ['d3', 'react-d3-speedometer'],
+          ui: ['lucide-react', 'react-hot-toast'],
+          utils: ['axios']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  }
 })

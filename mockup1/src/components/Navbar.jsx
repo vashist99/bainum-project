@@ -13,13 +13,23 @@ const Navbar = () => {
     <div className="navbar bg-base-100 shadow-lg border-b border-base-300">
       <div className="navbar-start">
         <div className="dropdown">
-          <div tabIndex={0} role="button" className="btn btn-ghost lg:hidden">
+          <button 
+            type="button"
+            tabIndex={0} 
+            role="button" 
+            className="btn btn-ghost lg:hidden"
+            aria-label="Open navigation menu"
+            aria-expanded="false"
+            aria-controls="mobile-menu"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-5 w-5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              role="img"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -28,10 +38,13 @@ const Navbar = () => {
                 d="M4 6h16M4 12h8m-8 6h16"
               />
             </svg>
-          </div>
+          </button>
           <ul
+            id="mobile-menu"
             tabIndex={0}
             className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52"
+            role="menu"
+            aria-label="Mobile navigation menu"
           >
             {isTeacher() && (
               <li>
@@ -111,27 +124,42 @@ const Navbar = () => {
       
       <div className="navbar-end">
         <div className="dropdown dropdown-end">
-          <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar">
+          <button 
+            type="button"
+            tabIndex={0} 
+            role="button" 
+            className="btn btn-ghost btn-circle avatar"
+            aria-label="User menu"
+            aria-expanded="false"
+            aria-haspopup="true"
+          >
             <div className="w-10 rounded-full bg-primary text-primary-content flex items-center justify-center">
-              <Users className="w-6 h-6" />
+              <Users className="w-6 h-6" aria-hidden="true" />
             </div>
-          </div>
+          </button>
           <ul
             tabIndex={0}
             className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52"
+            role="menu"
+            aria-label="User account menu"
           >
-            <li className="menu-title">
+            <li className="menu-title" role="none">
               <span>{user?.name || 'User'}</span>
             </li>
-            <li className="menu-title">
+            <li className="menu-title" role="none">
               <span className="text-xs text-base-content/60 capitalize">{user?.role || 'No Role'}</span>
             </li>
-            <div className="divider my-1"></div>
-            <li>
-              <a onClick={handleLogout} className="flex items-center gap-2 text-error">
-                <LogOut className="w-4 h-4" />
+            <div className="divider my-1" role="separator"></div>
+            <li role="menuitem">
+              <button 
+                type="button"
+                onClick={handleLogout} 
+                className="flex items-center gap-2 text-error w-full text-left"
+                aria-label="Logout from account"
+              >
+                <LogOut className="w-4 h-4" aria-hidden="true" />
                 Logout
-              </a>
+              </button>
             </li>
           </ul>
         </div>

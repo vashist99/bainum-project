@@ -80,39 +80,47 @@ const LoginForm = () => {
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Email Field */}
       <div className="form-control">
-        <label className="label">
+        <label htmlFor="email" className="label">
           <span className="label-text font-semibold">Email</span>
         </label>
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" aria-hidden="true">
             <Mail className="h-5 w-5 text-primary/60" />
           </div>
           <input
+            id="email"
             type="email"
             name="email"
             placeholder="your@email.com"
             className="input input-bordered input-primary w-full pl-10 focus:input-primary transition-all duration-200"
             value={formData.email}
             onChange={handleInputChange}
+            required
+            aria-describedby="email-hint"
           />
+        </div>
+        <div id="email-hint" className="label">
+          <span className="label-text-alt text-base-content/60">Enter your registered email address</span>
         </div>
       </div>
 
       {/* Role Field - Optional, for admin/teacher login */}
       <div className="form-control">
-        <label className="label">
+        <label htmlFor="role" className="label">
           <span className="label-text font-semibold">Role (Optional)</span>
           <span className="label-text-alt text-base-content/60">Leave blank for parent login</span>
         </label>
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" aria-hidden="true">
             <Shield className="h-5 w-5 text-primary/60" />
           </div>
           <select
+            id="role"
             name="role"
             className="select select-bordered select-primary w-full pl-10 focus:select-primary transition-all duration-200"
             value={formData.role}
             onChange={handleInputChange}
+            aria-describedby="role-hint"
           >
             <option value="">Auto-detect (Parent/Teacher/Admin)</option>
             <option value="parent">Parent</option>
@@ -120,36 +128,47 @@ const LoginForm = () => {
             <option value="admin">Administrator</option>
           </select>
         </div>
+        <div id="role-hint" className="label">
+          <span className="label-text-alt text-base-content/60">System will automatically detect your role if left blank</span>
+        </div>
       </div>
 
       {/* Password Field */}
       <div className="form-control">
-        <label className="label">
+        <label htmlFor="password" className="label">
           <span className="label-text font-semibold">Password</span>
         </label>
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" aria-hidden="true">
             <Lock className="h-5 w-5 text-primary/60" />
           </div>
           <input
+            id="password"
             type={showPassword ? "text" : "password"}
             name="password"
             placeholder="••••••••"
             className="input input-bordered input-primary w-full pl-10 pr-10 focus:input-primary transition-all duration-200"
             value={formData.password}
             onChange={handleInputChange}
+            required
+            aria-describedby="password-hint"
           />
           <button
             type="button"
             className="absolute inset-y-0 right-0 pr-3 flex items-center hover:scale-110 transition-transform"
             onClick={() => setShowPassword(!showPassword)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
           >
             {showPassword ? (
-              <EyeOff className="h-5 w-5 text-primary/60 hover:text-primary" />
+              <EyeOff className="h-5 w-5 text-primary/60 hover:text-primary" aria-hidden="true" />
             ) : (
-              <Eye className="h-5 w-5 text-primary/60 hover:text-primary" />
+              <Eye className="h-5 w-5 text-primary/60 hover:text-primary" aria-hidden="true" />
             )}
           </button>
+        </div>
+        <div id="password-hint" className="label">
+          <span className="label-text-alt text-base-content/60">Enter your account password</span>
         </div>
       </div>
 
