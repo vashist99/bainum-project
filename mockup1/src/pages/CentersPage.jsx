@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
-import { Plus, Edit, Trash2, ChevronDown, ChevronRight, Building2, Users, Mail } from "lucide-react";
+import Sidebar from "../components/Sidebar";
+import { CardLoading, EmptyCenters } from "../components/LoadingStates";
+import { Plus, Edit, Trash2, ChevronDown, ChevronRight, Building2, Users, Mail, MapPin, Phone, Search, Filter } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,6 +15,14 @@ const CentersPage = () => {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedCenters, setExpandedCenters] = useState(new Set());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState("cards"); // "cards" or "table"
+  
+  const breadcrumbs = [
+    { label: "Dashboard", href: "/home" },
+    { label: "Centers", href: "/centers" }
+  ];
 
   // Load centers from API on component mount
   useEffect(() => {
@@ -78,273 +88,406 @@ const CentersPage = () => {
     if (!isAdmin()) return [];
     return teachers.filter(teacher => teacher.center === centerName);
   };
+  
+  const filteredCenters = centers.filter(center =>
+    center.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    center.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    center.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  const handleSidebarToggle = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+  
+  const handleAddCenter = () => {
+    navigate("/centers/add");
+  };
 
-  return (
-    <div className="min-h-screen bg-base-200">
-      <Navbar />
+  const CenterCard = ({ center, index }) => {
+    const centerTeachers = getTeachersForCenter(center.name);
+    const hasTeachers = centerTeachers.length > 0;
+    const isExpanded = expandedCenters.has(center._id);
 
-      <div className="container mx-auto p-4 md:p-6">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Centers
-          </h1>
-          <div className="flex gap-2 flex-shrink-0">
-            <button
-              onClick={() => navigate("/centers/add")}
-              className="btn btn-primary gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              Add Center
-            </button>
-          </div>
-        </div>
-
-        <div className="card bg-base-100 shadow-xl">
-          <div className="card-body">
-            {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <span className="loading loading-spinner loading-lg"></span>
+    return (
+      <div className="card bg-base-100 shadow-xl border border-base-200 hover:shadow-2xl transition-all duration-300">
+        <div className="card-body p-6">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="bg-primary/10 p-3 rounded-lg">
+                <Building2 className="w-6 h-6 text-primary" />
               </div>
-            ) : (
-              <>
-              {/* Mobile: Card layout */}
-              <div className="block md:hidden space-y-3">
-                {centers.length === 0 ? (
-                  <p className="text-center text-base-content/60 py-8">
-                    No centers added yet. Click &quot;Add Center&quot; to get started.
-                  </p>
-                ) : (
-                  centers.map((center, index) => {
-                    const isExpanded = expandedCenters.has(center._id);
-                    const centerTeachers = getTeachersForCenter(center.name);
-                    const hasTeachers = centerTeachers.length > 0;
-                    return (
-                      <div key={center._id} className="card bg-base-200 border border-base-300 overflow-hidden">
-                        <div
-                          className="card-body p-4"
-                          onClick={() => isAdmin() && hasTeachers && toggleCenterExpansion(center._id)}
-                          role={isAdmin() && hasTeachers ? "button" : undefined}
-                          tabIndex={isAdmin() && hasTeachers ? 0 : undefined}
-                          onKeyDown={(e) => isAdmin() && hasTeachers && (e.key === "Enter" || e.key === " ") && toggleCenterExpansion(center._id)}
-                        >
-                          <div className="flex justify-between items-start gap-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {isAdmin() && hasTeachers && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); toggleCenterExpansion(center._id); }}
-                                    className="btn btn-ghost btn-xs btn-circle flex-shrink-0"
-                                  >
-                                    {isExpanded ? (
-                                      <ChevronDown className="w-4 h-4" />
-                                    ) : (
-                                      <ChevronRight className="w-4 h-4" />
-                                    )}
-                                  </button>
-                                )}
-                                <h3 className="font-semibold text-base flex items-center gap-2">
-                                  <Building2 className="w-4 h-4 text-primary flex-shrink-0" />
-                                  <span className="text-base-content/60">#{index + 1}</span>
-                                  {center.name}
-                                  {hasTeachers && (
-                                    <span className="badge badge-sm badge-secondary">{centerTeachers.length}</span>
-                                  )}
-                                </h3>
-                              </div>
-                              <div className="text-sm text-base-content/70 mt-1 space-y-1">
-                                <p>{center.address || "N/A"}</p>
-                                <p>{center.phone || "N/A"}</p>
-                                <p className="truncate">{center.email || "N/A"}</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => navigate(`/centers/edit/${center._id}`)}
-                                className="btn btn-ghost btn-xs"
-                              >
-                                <Edit className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(center._id)}
-                                className="btn btn-ghost btn-xs text-error"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                          {isAdmin() && isExpanded && hasTeachers && (
-                            <div className="mt-3 pt-3 border-t border-base-300 space-y-2">
-                              <h4 className="font-semibold text-sm text-base-content/70">
-                                Teachers at {center.name} ({centerTeachers.length})
-                              </h4>
-                              {centerTeachers.map((teacher) => (
-                                <div
-                                  key={teacher._id}
-                                  onClick={(e) => { e.stopPropagation(); navigate(`/data/teacher/${teacher._id}`); }}
-                                  className="flex items-center justify-between p-2 rounded-lg bg-base-100 hover:bg-base-300 cursor-pointer"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <Users className="w-4 h-4 text-primary" />
-                                    <span className="font-medium text-sm">{teacher.name}</span>
-                                  </div>
-                                  <ChevronRight className="w-4 h-4 text-base-content/60" />
-                                </div>
-                              ))}
-                            </div>
-                          )}
+              <div className="flex-1">
+                <h3 className="card-title text-lg font-bold text-base-content">
+                  {center.name}
+                  {hasTeachers && (
+                    <span className="badge badge-secondary badge-sm">
+                      {centerTeachers.length} {centerTeachers.length === 1 ? 'teacher' : 'teachers'}
+                    </span>
+                  )}
+                </h3>
+                <span className="text-sm text-base-content/60">Center #{index + 1}</span>
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="dropdown dropdown-end">
+              <button className="btn btn-ghost btn-sm btn-circle">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                </svg>
+              </button>
+              <ul className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-40 border">
+                <li>
+                  <button
+                    onClick={() => navigate(`/centers/edit/${center._id}`)}
+                    className="flex items-center gap-2"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => handleDelete(center._id)}
+                    className="flex items-center gap-2 text-error"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm text-base-content/70">
+              <MapPin className="w-4 h-4 flex-shrink-0" />
+              <span>{center.address || "No address provided"}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-base-content/70">
+              <Phone className="w-4 h-4 flex-shrink-0" />
+              <span>{center.phone || "No phone provided"}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-base-content/70">
+              <Mail className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">{center.email || "No email provided"}</span>
+            </div>
+          </div>
+
+          {/* Teachers Section */}
+          {isAdmin() && hasTeachers && (
+            <>
+              <div className="divider my-4"></div>
+              <div>
+                <button
+                  onClick={() => toggleCenterExpansion(center._id)}
+                  className="flex items-center gap-2 text-sm font-medium text-primary hover:underline mb-3"
+                >
+                  <Users className="w-4 h-4" />
+                  View Teachers ({centerTeachers.length})
+                  {isExpanded ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+                
+                {isExpanded && (
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {centerTeachers.map((teacher) => (
+                      <div
+                        key={teacher._id}
+                        onClick={() => navigate(`/data/teacher/${teacher._id}`)}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-base-50 hover:bg-base-200 cursor-pointer transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center">
+                          <Users className="w-4 h-4 text-secondary" />
                         </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{teacher.name}</p>
+                          <p className="text-xs text-base-content/60">{teacher.email}</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-base-content/40" />
                       </div>
-                    );
-                  })
+                    ))}
+                  </div>
                 )}
               </div>
-              {/* Desktop: Table layout */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="table table-zebra">
-                  <thead>
-                    <tr>
-                      {isAdmin() && <th className="w-12"></th>}
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>Address</th>
-                      <th>Phone</th>
-                      <th>Email</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {centers.length === 0 ? (
-                      <tr>
-                        <td colSpan={isAdmin() ? 7 : 6} className="text-center text-base-content/60">
-                          No centers added yet. Click "Add Center" to get started.
-                        </td>
-                      </tr>
-                    ) : (
-                      centers.flatMap((center, index) => {
-                        const isExpanded = expandedCenters.has(center._id);
-                        const centerTeachers = getTeachersForCenter(center.name);
-                        const hasTeachers = centerTeachers.length > 0;
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-                        const rows = [
-                          <tr 
-                            key={center._id} 
-                            onClick={(e) => {
-                              // Don't expand if clicking on action buttons
-                              if (!e.target.closest('button, .btn')) {
-                                if (isAdmin() && hasTeachers) {
-                                  toggleCenterExpansion(center._id);
-                                }
-                              }
-                            }}
-                            className={isAdmin() && hasTeachers ? "cursor-pointer hover:bg-base-200" : ""}
-                          >
-                            {isAdmin() && (
-                              <td onClick={(e) => e.stopPropagation()}>
-                                {hasTeachers ? (
-                                  <button
-                                    onClick={() => toggleCenterExpansion(center._id)}
-                                    className="btn btn-ghost btn-xs btn-circle"
+  return (
+    <div className="min-h-screen bg-base-200 flex">
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onToggle={handleSidebarToggle}
+        currentPath="/centers"
+      />
+      
+      <div className="flex-1 flex flex-col lg:ml-0">
+        <Navbar 
+          onToggleSidebar={handleSidebarToggle}
+          showSidebar={sidebarOpen}
+          breadcrumbs={breadcrumbs}
+        />
+        
+        <main className="flex-1 overflow-auto">
+
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+              <div>
+                <h1 className="text-3xl font-bold text-base-content mb-2">
+                  Education Centers
+                </h1>
+                <p className="text-base-content/70">
+                  Manage and organize your educational centers
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                {/* Search */}
+                <div className="form-control">
+                  <div className="input-group">
+                    <span className="bg-base-300">
+                      <Search className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Search centers..."
+                      className="input input-bordered input-sm w-64"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                {/* View Toggle */}
+                <div className="btn-group">
+                  <button 
+                    className={`btn btn-sm ${viewMode === 'cards' ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setViewMode('cards')}
+                  >
+                    Cards
+                  </button>
+                  <button 
+                    className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setViewMode('table')}
+                  >
+                    Table
+                  </button>
+                </div>
+                
+                {/* Add Button */}
+                <button
+                  onClick={handleAddCenter}
+                  className="btn btn-primary gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Center
+                </button>
+              </div>
+            </div>
+            
+            {/* Stats */}
+            {!loading && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="stat bg-base-100 shadow-lg rounded-lg">
+                  <div className="stat-figure text-primary">
+                    <Building2 className="w-8 h-8" />
+                  </div>
+                  <div className="stat-title">Total Centers</div>
+                  <div className="stat-value text-primary">{centers.length}</div>
+                  <div className="stat-desc">Across all locations</div>
+                </div>
+                
+                <div className="stat bg-base-100 shadow-lg rounded-lg">
+                  <div className="stat-figure text-secondary">
+                    <Users className="w-8 h-8" />
+                  </div>
+                  <div className="stat-title">Total Teachers</div>
+                  <div className="stat-value text-secondary">{teachers.length}</div>
+                  <div className="stat-desc">Working across centers</div>
+                </div>
+                
+                <div className="stat bg-base-100 shadow-lg rounded-lg">
+                  <div className="stat-figure text-accent">
+                    <Filter className="w-8 h-8" />
+                  </div>
+                  <div className="stat-title">Filtered Results</div>
+                  <div className="stat-value text-accent">{filteredCenters.length}</div>
+                  <div className="stat-desc">Matching search criteria</div>
+                </div>
+              </div>
+            )}
+
+            {/* Content */}
+            {loading ? (
+              <CardLoading count={6} />
+            ) : filteredCenters.length === 0 ? (
+              searchTerm ? (
+                <div className="text-center py-16">
+                  <Search className="w-16 h-16 mx-auto mb-4 text-base-content/30" />
+                  <h3 className="text-xl font-bold text-base-content mb-2">No results found</h3>
+                  <p className="text-base-content/60 mb-4">
+                    No centers match your search for "{searchTerm}"
+                  </p>
+                  <button 
+                    onClick={() => setSearchTerm("")}
+                    className="btn btn-ghost"
+                  >
+                    Clear search
+                  </button>
+                </div>
+              ) : (
+                <EmptyCenters onAdd={handleAddCenter} />
+              )
+            ) : (
+              <>
+                {/* Cards View */}
+                {viewMode === "cards" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {filteredCenters.map((center, index) => (
+                      <CenterCard key={center._id} center={center} index={index} />
+                    ))}
+                  </div>
+                )}
+                
+                {/* Table View */}
+                {viewMode === "table" && (
+                  <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body p-0">
+                      <div className="overflow-x-auto">
+                        <table className="table table-zebra">
+                          <thead>
+                            <tr>
+                              {isAdmin() && <th className="w-12"></th>}
+                              <th>#</th>
+                              <th>Name</th>
+                              <th>Address</th>
+                              <th>Phone</th>
+                              <th>Email</th>
+                              <th>Teachers</th>
+                              <th>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredCenters.map((center, index) => {
+                              const centerTeachers = getTeachersForCenter(center.name);
+                              const hasTeachers = centerTeachers.length > 0;
+                              const isExpanded = expandedCenters.has(center._id);
+
+                              return (
+                                <>
+                                  <tr 
+                                    key={center._id} 
+                                    className="hover"
                                   >
-                                    {isExpanded ? (
-                                      <ChevronDown className="w-4 h-4" />
-                                    ) : (
-                                      <ChevronRight className="w-4 h-4" />
+                                    {isAdmin() && (
+                                      <td>
+                                        {hasTeachers ? (
+                                          <button
+                                            onClick={() => toggleCenterExpansion(center._id)}
+                                            className="btn btn-ghost btn-xs btn-circle"
+                                          >
+                                            {isExpanded ? (
+                                              <ChevronDown className="w-4 h-4" />
+                                            ) : (
+                                              <ChevronRight className="w-4 h-4" />
+                                            )}
+                                          </button>
+                                        ) : (
+                                          <span className="w-6"></span>
+                                        )}
+                                      </td>
                                     )}
-                                  </button>
-                                ) : (
-                                  <span className="w-6"></span>
-                                )}
-                              </td>
-                            )}
-                            <td className="align-middle">{index + 1}</td>
-                            <td className="align-middle pl-3">
-                              <div className="flex items-center gap-2">
-                                <Building2 className="w-5 h-5 text-primary flex-shrink-0" />
-                                {center.name}
-                                {isAdmin() && hasTeachers && (
-                                  <span className="badge badge-sm badge-secondary">
-                                    {centerTeachers.length}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="align-middle">{center.address || 'N/A'}</td>
-                            <td className="align-middle">{center.phone || 'N/A'}</td>
-                            <td className="align-middle">{center.email || 'N/A'}</td>
-                            <td className="align-middle" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex gap-2">
-                                <button 
-                                  onClick={() => navigate(`/centers/edit/${center._id}`)}
-                                  className="btn btn-ghost btn-xs"
-                                  title="Edit center"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(center._id)}
-                                  className="btn btn-ghost btn-xs text-error"
-                                  title="Delete center"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ];
-
-                        // Add teachers row if expanded
-                        if (isAdmin() && isExpanded && hasTeachers) {
-                          rows.push(
-                            <tr key={`${center._id}-teachers`}>
-                              <td colSpan={isAdmin() ? 7 : 6} className="bg-base-200 p-0">
-                                <div className="p-4 pl-12">
-                                  <h4 className="font-semibold mb-3 text-sm text-base-content/70">
-                                    Teachers at {center.name} ({centerTeachers.length})
-                                  </h4>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {centerTeachers.map((teacher) => (
-                                      <div
-                                        key={teacher._id}
-                                        onClick={() => navigate(`/data/teacher/${teacher._id}`)}
-                                        className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-base-300 hover:border-primary"
-                                      >
-                                        <div className="card-body p-4">
-                                          <div className="flex items-center gap-2">
-                                            <Users className="w-4 h-4 text-primary" />
-                                            <h5 className="font-semibold text-sm">{teacher.name}</h5>
-                                          </div>
-                                          <div className="text-xs text-base-content/60 mt-2">
-                                            <p>Email: {teacher.email}</p>
-                                            {teacher.education && <p>Education: {teacher.education}</p>}
-                                          </div>
-                                          <div className="card-actions justify-end mt-2">
-                                            <button className="btn btn-xs btn-primary">
-                                              View Details
-                                            </button>
+                                    <td>{index + 1}</td>
+                                    <td>
+                                      <div className="flex items-center gap-2">
+                                        <Building2 className="w-5 h-5 text-primary" />
+                                        <span className="font-semibold">{center.name}</span>
+                                      </div>
+                                    </td>
+                                    <td>{center.address || 'N/A'}</td>
+                                    <td>{center.phone || 'N/A'}</td>
+                                    <td className="max-w-xs truncate">{center.email || 'N/A'}</td>
+                                    <td>
+                                      {hasTeachers ? (
+                                        <span className="badge badge-secondary">
+                                          {centerTeachers.length}
+                                        </span>
+                                      ) : (
+                                        <span className="text-base-content/50">None</span>
+                                      )}
+                                    </td>
+                                    <td>
+                                      <div className="flex gap-2">
+                                        <button 
+                                          onClick={() => navigate(`/centers/edit/${center._id}`)}
+                                          className="btn btn-ghost btn-xs"
+                                          title="Edit center"
+                                        >
+                                          <Edit className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDelete(center._id)}
+                                          className="btn btn-ghost btn-xs text-error"
+                                          title="Delete center"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  
+                                  {/* Expanded teacher details */}
+                                  {isAdmin() && isExpanded && hasTeachers && (
+                                    <tr>
+                                      <td colSpan={8} className="bg-base-50 p-0">
+                                        <div className="p-4">
+                                          <h4 className="font-semibold mb-3 text-sm">
+                                            Teachers at {center.name}
+                                          </h4>
+                                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {centerTeachers.map((teacher) => (
+                                              <div
+                                                key={teacher._id}
+                                                onClick={() => navigate(`/data/teacher/${teacher._id}`)}
+                                                className="p-3 bg-base-100 rounded-lg hover:bg-base-200 cursor-pointer transition-colors border"
+                                              >
+                                                <div className="flex items-center gap-2">
+                                                  <Users className="w-4 h-4 text-secondary" />
+                                                  <div>
+                                                    <p className="font-medium text-sm">{teacher.name}</p>
+                                                    <p className="text-xs text-base-content/60">{teacher.email}</p>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
                                           </div>
                                         </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  {centerTeachers.length === 0 && (
-                                    <p className="text-sm text-base-content/60">No teachers assigned to this center.</p>
+                                      </td>
+                                    </tr>
                                   )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        return rows;
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                                </>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );

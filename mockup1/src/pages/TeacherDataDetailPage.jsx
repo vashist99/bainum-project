@@ -274,7 +274,8 @@ const TeacherDataDetailPage = () => {
                           minute: "2-digit",
                         });
                         const activityLine = a.activity ? `Activity: ${a.activity}\n` : "";
-                        return `=== Transcript from ${dateStr} ===\n${activityLine}${a.uploadedBy ? `Uploaded by: ${a.uploadedBy}\n` : ""}${a.transcript}\n\n`;
+                        const locationLine = a.location ? `Location: ${a.location}\n` : "";
+                        return `=== Transcript from ${dateStr} ===\n${activityLine}${locationLine}${a.uploadedBy ? `Uploaded by: ${a.uploadedBy}\n` : ""}${a.transcript}\n\n`;
                       })
                       .join("\n");
                     const blob = new Blob([text], { type: "text/plain" });
@@ -333,6 +334,14 @@ const TeacherDataDetailPage = () => {
                                     }
                                   >
                                     {assessment.activity}
+                                  </span>
+                                )}
+                                {assessment.location && (
+                                  <span
+                                    className="badge badge-outline badge-secondary badge-sm font-normal"
+                                    title="Recording location"
+                                  >
+                                    📍 {assessment.location}
                                   </span>
                                 )}
                               </h3>

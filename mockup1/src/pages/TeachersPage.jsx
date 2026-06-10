@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import Navbar from "../components/Navbar";
-import { Plus, Edit, Trash2, ChevronDown, ChevronRight, User, Mail, Building2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import Sidebar from "../components/Sidebar";
+import { CardLoading, EmptyTeachers } from "../components/LoadingStates";
+import { Plus, Edit, Trash2, ChevronDown, ChevronRight, User, Mail, Building2, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
@@ -23,6 +25,14 @@ const TeachersPage = () => {
   const [sortByLanguage, setSortByLanguage] = useState(null); // null | 'asc' | 'desc'
   /** Lowercased emails that already have a teacher invitation sent */
   const [invitedTeacherEmails, setInvitedTeacherEmails] = useState(() => new Set());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState("cards");
+
+  const breadcrumbs = [
+    { label: "Dashboard", href: "/home" },
+    { label: "Teachers" }
+  ];
 
   useEffect(() => {
     if (!isAdmin()) return;
@@ -97,6 +107,17 @@ const TeachersPage = () => {
     let list = selectedCenter
       ? teachers.filter((t) => t.center === selectedCenter)
       : teachers;
+    
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter((t) => 
+        t.name?.toLowerCase().includes(term) ||
+        t.email?.toLowerCase().includes(term) ||
+        t.center?.toLowerCase().includes(term) ||
+        t.education?.toLowerCase().includes(term)
+      );
+    }
     if (sortByCenter) {
       list = [...list].sort((a, b) => {
         const ca = (a.center || '').toLowerCase();
@@ -277,26 +298,356 @@ const TeachersPage = () => {
       setSendingInvite(false);
     }
   };
+  
+  const handleSidebarToggle = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+  
+  const handleAddTeacher = () => {
+    navigate("/teachers/add");
+  };
+
+  const TeacherCard = ({ teacher, index }) => {
+    const teacherChildren = getChildrenForTeacher(teacher.name);
+    const hasChildren = teacherChildren.length > 0;
+    const isExpanded = expandedTeachers.has(teacher._id);
+    const primaryLanguage = getPrimaryLanguageForTeacher(teacher.name);
+    const isInvited = invitedTeacherEmails.has((teacher.email || "").toLowerCase().trim());
+
+    return (
+      <div className="card bg-base-100 shadow-xl border border-base-200 hover:shadow-2xl transition-all duration-300">
+        <div className="card-body p-6">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="card-title text-lg font-bold text-base-content">
+                  {isAdmin() ? (
+                    <button
+                      onClick={() => navigate(`/teachers/${teacher.username || teacher._id}`)}
+                      className="hover:text-primary transition-colors"
+                    >
+                      {teacher.name}
+                    </button>
+                  ) : (
+                    teacher.name
+                  )}
+                  {hasChildren && (
+                    <span className="badge badge-secondary badge-sm">
+                      {teacherChildren.length} {teacherChildren.length === 1 ? 'student' : 'students'}
+                    </span>
+                  )}
+                </h3>
+                <div className="flex items-center gap-2 text-sm text-base-content/60">
+                  <span>Teacher #{index + 1}</span>
+                  {teacher.center && (
+                    <span className="badge badge-outline badge-sm">{teacher.center}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="dropdown dropdown-end">
+              <button className="btn btn-ghost btn-sm btn-circle">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                </svg>
+              </button>
+              <ul className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-48 border">
+                <li>
+                  <button
+                    onClick={() => navigate(`/teachers/edit/${teacher._id}`)}
+                    className="flex items-center gap-2"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit Teacher
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => handleDelete(teacher._id)}
+                    className="flex items-center gap-2 text-error"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Teacher
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm text-base-content/70">
+              <Mail className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">{teacher.email}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-base-content/60">Education:</span>
+                <p className="font-medium">{teacher.education || 'N/A'}</p>
+              </div>
+              <div>
+                <span className="text-base-content/60">Date of Birth:</span>
+                <p className="font-medium">
+                  {teacher.dateOfBirth 
+                    ? new Date(teacher.dateOfBirth).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric', 
+                        year: 'numeric'
+                      })
+                    : 'N/A'
+                  }
+                </p>
+              </div>
+            </div>
+            {primaryLanguage && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-base-content/60">Primary Language:</span>
+                <span className="badge badge-info badge-sm">{primaryLanguage}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-between pt-4 border-t border-base-200">
+            <div className="flex gap-2">
+              {isInvited ? (
+                <span className="btn btn-ghost btn-sm no-animation opacity-80 cursor-default border border-base-300">
+                  Invited
+                </span>
+              ) : (
+                <button
+                  onClick={() => openInviteModal(teacher)}
+                  className="btn btn-primary btn-sm gap-1"
+                >
+                  <Mail className="w-4 h-4" />
+                  Invite
+                </button>
+              )}
+            </div>
+            
+            {isAdmin() && hasChildren && (
+              <button
+                onClick={() => toggleTeacherExpansion(teacher._id)}
+                className="btn btn-ghost btn-sm gap-1"
+              >
+                <Users className="w-4 h-4" />
+                {isExpanded ? 'Hide' : 'View'} Students
+                {isExpanded ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Students Section */}
+          {isAdmin() && isExpanded && (
+            <div className="mt-4 pt-4 border-t border-base-200">
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {teacherChildren.length > 0 ? (
+                  teacherChildren.map((child) => (
+                    <div
+                      key={child._id}
+                      onClick={() => navigate(`/data/child/${child._id}`)}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-base-50 hover:bg-base-200 cursor-pointer transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+                        <User className="w-4 h-4 text-accent" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{child.name}</p>
+                        <div className="flex gap-2 text-xs text-base-content/60">
+                          {child.dateOfBirth && (
+                            <span>Age: {(() => {
+                              const birthDate = new Date(child.dateOfBirth);
+                              const today = new Date();
+                              const yearsDiff = today.getFullYear() - birthDate.getFullYear();
+                              const monthsDiff = today.getMonth() - birthDate.getMonth();
+                              const totalMonths = yearsDiff * 12 + monthsDiff;
+                              return `${totalMonths} months`;
+                            })()}</span>
+                          )}
+                          {child.gender && <span>Gender: {child.gender}</span>}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-base-content/40" />
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-base-content/60 text-center py-4">
+                    No students assigned
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-base-200">
-      <Navbar />
+    <div className="min-h-screen bg-base-200 flex">
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onToggle={handleSidebarToggle}
+        currentPath="/teachers"
+      />
+      
+      <div className="flex-1 flex flex-col lg:ml-0">
+        <Navbar 
+          onToggleSidebar={handleSidebarToggle}
+          showSidebar={sidebarOpen}
+          breadcrumbs={breadcrumbs}
+        />
+        
+        <main className="flex-1 overflow-auto">
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+              <div>
+                <h1 className="text-3xl font-bold text-base-content mb-2">
+                  Teachers
+                </h1>
+                <p className="text-base-content/70">
+                  Manage teacher profiles and class assignments
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                {/* Search */}
+                <div className="form-control">
+                  <div className="input-group">
+                    <span className="bg-base-300">
+                      <Search className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Search teachers..."
+                      className="input input-bordered input-sm w-64"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                {/* View Toggle */}
+                <div className="btn-group">
+                  <button 
+                    className={`btn btn-sm ${viewMode === 'cards' ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setViewMode('cards')}
+                  >
+                    Cards
+                  </button>
+                  <button 
+                    className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setViewMode('table')}
+                  >
+                    Table
+                  </button>
+                </div>
+                
+                {/* Add Button */}
+                <button
+                  onClick={handleAddTeacher}
+                  className="btn btn-primary gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Teacher
+                </button>
+              </div>
+            </div>
+            
+            {/* Stats */}
+            {!loading && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="stat bg-base-100 shadow-lg rounded-lg">
+                  <div className="stat-figure text-primary">
+                    <Users className="w-8 h-8" />
+                  </div>
+                  <div className="stat-title">Total Teachers</div>
+                  <div className="stat-value text-primary">{teachers.length}</div>
+                  <div className="stat-desc">Active teachers</div>
+                </div>
+                
+                <div className="stat bg-base-100 shadow-lg rounded-lg">
+                  <div className="stat-figure text-secondary">
+                    <Building2 className="w-8 h-8" />
+                  </div>
+                  <div className="stat-title">Centers</div>
+                  <div className="stat-value text-secondary">{centers.length}</div>
+                  <div className="stat-desc">Locations served</div>
+                </div>
+                
+                <div className="stat bg-base-100 shadow-lg rounded-lg">
+                  <div className="stat-figure text-accent">
+                    <User className="w-8 h-8" />
+                  </div>
+                  <div className="stat-title">Total Students</div>
+                  <div className="stat-value text-accent">{children.length}</div>
+                  <div className="stat-desc">Under supervision</div>
+                </div>
+                
+                <div className="stat bg-base-100 shadow-lg rounded-lg">
+                  <div className="stat-figure text-info">
+                    <Filter className="w-8 h-8" />
+                  </div>
+                  <div className="stat-title">Filtered Results</div>
+                  <div className="stat-value text-info">{filteredTeachers.length}</div>
+                  <div className="stat-desc">Matching criteria</div>
+                </div>
+              </div>
+            )}
 
-      <div className="container mx-auto p-4 md:p-6">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Teachers
-          </h1>
-          <div className="flex gap-2 flex-shrink-0">
-            <button
-              onClick={() => navigate("/teachers/add")}
-              className="btn btn-primary gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              Add Teacher
-            </button>
-          </div>
-        </div>
+            {/* Filters */}
+            {isAdmin() && centers.length > 0 && (
+              <div className="card bg-base-100 shadow-lg mb-6">
+                <div className="card-body p-4">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="form-control">
+                      <label className="label">
+                        <span className="label-text font-semibold flex items-center gap-2">
+                          <Building2 className="w-4 h-4" />
+                          Filter by Center
+                        </span>
+                      </label>
+                      <select
+                        className="select select-bordered select-sm w-full max-w-xs"
+                        value={selectedCenter}
+                        onChange={(e) => setSelectedCenter(e.target.value)}
+                        disabled={loading}
+                      >
+                        <option value="">All centers</option>
+                        {centers.map((c) => (
+                          <option key={c._id} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {(selectedCenter || searchTerm) && (
+                      <button
+                        onClick={() => {
+                          setSelectedCenter("");
+                          setSearchTerm("");
+                        }}
+                        className="btn btn-ghost btn-sm"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
         {isAdmin() && (
           <div className="card bg-base-100 shadow-xl mb-6">
@@ -326,338 +677,242 @@ const TeachersPage = () => {
           </div>
         )}
 
-        <div className="card bg-base-100 shadow-xl">
-          <div className="card-body">
+            {/* Content */}
             {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <span className="loading loading-spinner loading-lg"></span>
-              </div>
+              <CardLoading count={6} />
+            ) : filteredTeachers.length === 0 ? (
+              searchTerm || selectedCenter ? (
+                <div className="text-center py-16">
+                  <Search className="w-16 h-16 mx-auto mb-4 text-base-content/30" />
+                  <h3 className="text-xl font-bold text-base-content mb-2">No results found</h3>
+                  <p className="text-base-content/60 mb-4">
+                    No teachers match your search criteria
+                  </p>
+                  <button 
+                    onClick={() => {
+                      setSearchTerm("");
+                      setSelectedCenter("");
+                    }}
+                    className="btn btn-ghost"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              ) : (
+                <EmptyTeachers onAdd={handleAddTeacher} />
+              )
             ) : (
               <>
-              {/* Mobile: Card layout */}
-              <div className="block md:hidden space-y-3">
-                {filteredTeachers.length === 0 ? (
-                  <p className="text-center text-base-content/60 py-8">
-                    {selectedCenter
-                      ? `No teachers found at ${selectedCenter}.`
-                      : "No teachers added yet. Click \"Add Teacher\" to get started."}
-                  </p>
-                ) : (
-                  filteredTeachers.map((teacher, index) => {
-                    const isExpanded = expandedTeachers.has(teacher._id);
-                    const teacherChildren = getChildrenForTeacher(teacher.name);
-                    const hasChildren = teacherChildren.length > 0;
-                    return (
-                      <div key={teacher._id} className="card bg-base-200 border border-base-300 overflow-hidden">
-                        <div
-                          className="card-body p-4"
-                          onClick={() => isAdmin() && toggleTeacherExpansion(teacher._id)}
-                          role={isAdmin() ? "button" : undefined}
-                          tabIndex={isAdmin() ? 0 : undefined}
-                          onKeyDown={(e) => isAdmin() && (e.key === "Enter" || e.key === " ") && toggleTeacherExpansion(teacher._id)}
-                        >
-                          <div className="flex justify-between items-start gap-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {isAdmin() && hasChildren && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); toggleTeacherExpansion(teacher._id); }}
-                                    className="btn btn-ghost btn-xs btn-circle flex-shrink-0"
-                                  >
-                                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                  </button>
-                                )}
-                                <h3 className="font-semibold text-base flex items-center gap-1">
-                                  <span className="text-base-content/60">#{index + 1}</span>
-                                  {isAdmin() ? (
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); navigate(`/teachers/${teacher.username || teacher._id}`); }}
-                                      className="link link-primary hover:underline"
-                                    >
-                                      {teacher.name}
-                                    </button>
-                                  ) : (
-                                    <span>{teacher.name}</span>
-                                  )}
-                                  {hasChildren && <span className="badge badge-sm badge-secondary">{teacherChildren.length}</span>}
-                                </h3>
-                              </div>
-                              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-sm text-base-content/70">
-                                <span className="truncate">{teacher.email}</span>
-                                <span>{teacher.center}</span>
-                              </div>
-                              <div className="text-xs text-base-content/60 mt-1">
-                                {teacher.education} • DOB: {teacher.dateOfBirth ? new Date(teacher.dateOfBirth).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap gap-1 justify-end flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={() => openInviteModal(teacher)} className="btn btn-primary btn-xs gap-1">
-                                <Mail className="w-3 h-3" /> Invite
-                              </button>
-                              <button onClick={() => navigate(`/teachers/edit/${teacher._id}`)} className="btn btn-ghost btn-xs">
-                                <Edit className="w-3 h-3" />
-                              </button>
-                              <button onClick={() => handleDelete(teacher._id)} className="btn btn-ghost btn-xs text-error">
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                          {isAdmin() && isExpanded && (
-                            <div className="mt-3 pt-3 border-t border-base-300 space-y-2">
-                              <h4 className="font-semibold text-sm text-base-content/70">Children ({teacherChildren.length})</h4>
-                              {teacherChildren.length > 0 ? (
-                                teacherChildren.map((child) => (
-                                  <div
-                                    key={child._id}
-                                    onClick={(e) => { e.stopPropagation(); navigate(`/data/child/${child._id}`); }}
-                                    className="flex items-center justify-between p-2 rounded-lg bg-base-100 hover:bg-base-300 cursor-pointer"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <User className="w-4 h-4 text-primary" />
-                                      <span className="font-medium text-sm">{child.name}</span>
-                                    </div>
-                                    <ChevronRight className="w-4 h-4 text-base-content/60" />
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-sm text-base-content/60">No children assigned.</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
+                {/* Cards View */}
+                {viewMode === "cards" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {filteredTeachers.map((teacher, index) => (
+                      <TeacherCard key={teacher._id} teacher={teacher} index={index} />
+                    ))}
+                  </div>
                 )}
-              </div>
-              {/* Desktop: Table layout */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="table table-zebra">
-                  <thead>
-                    <tr>
-                      {isAdmin() && <th className="w-12"></th>}
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Education</th>
-                      <th>Date of Birth</th>
-                      <th>
-                        <button
-                          type="button"
-                          onClick={handleSortByCenter}
-                          className="flex items-center gap-1 hover:underline"
-                        >
-                          Center
-                          {sortByCenter === 'asc' && <ArrowUp className="w-3 h-3" />}
-                          {sortByCenter === 'desc' && <ArrowDown className="w-3 h-3" />}
-                          {!sortByCenter && <ArrowUpDown className="w-3 h-3 opacity-50" />}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          type="button"
-                          onClick={handleSortByLanguage}
-                          className="flex items-center gap-1 hover:underline"
-                        >
-                          Language
-                          {sortByLanguage === 'asc' && <ArrowUp className="w-3 h-3" />}
-                          {sortByLanguage === 'desc' && <ArrowDown className="w-3 h-3" />}
-                          {!sortByLanguage && <ArrowUpDown className="w-3 h-3 opacity-50" />}
-                        </button>
-                      </th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTeachers.length === 0 ? (
-                      <tr>
-                        <td colSpan={isAdmin() ? 9 : 8} className="text-center text-base-content/60">
-                          {selectedCenter
-                            ? `No teachers found at ${selectedCenter}.`
-                            : "No teachers added yet. Click \"Add Teacher\" to get started."}
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredTeachers.flatMap((teacher, index) => {
-                        const isExpanded = expandedTeachers.has(teacher._id);
-                        const teacherChildren = getChildrenForTeacher(teacher.name);
-                        const hasChildren = teacherChildren.length > 0;
-
-                        const rows = [
-                          <tr 
-                            key={teacher._id} 
-                            onClick={(e) => {
-                              // Don't expand if clicking on action buttons
-                              if (!e.target.closest('button, .btn')) {
-                                if (isAdmin()) {
-                                  toggleTeacherExpansion(teacher._id);
-                                }
-                              }
-                            }}
-                            className={isAdmin() ? "cursor-pointer hover:bg-base-200" : ""}
-                          >
-                            {isAdmin() && (
-                              <td onClick={(e) => e.stopPropagation()}>
+                
+                {/* Table View */}
+                {viewMode === "table" && (
+                  <div className="card bg-base-100 shadow-xl">
+                    <div className="card-body p-0">
+                      <div className="overflow-x-auto">
+                        <table className="table table-zebra">
+                          <thead>
+                            <tr>
+                              {isAdmin() && <th className="w-12"></th>}
+                              <th>#</th>
+                              <th>Name</th>
+                              <th>Email</th>
+                              <th>Education</th>
+                              <th>Date of Birth</th>
+                              <th>
                                 <button
-                                  onClick={() => toggleTeacherExpansion(teacher._id)}
-                                  className="btn btn-ghost btn-xs btn-circle"
-                                  title={hasChildren ? `View ${teacherChildren.length} children` : "View children (none assigned)"}
+                                  type="button"
+                                  onClick={handleSortByCenter}
+                                  className="flex items-center gap-1 hover:underline"
                                 >
-                                  {isExpanded ? (
-                                    <ChevronDown className="w-4 h-4" />
-                                  ) : (
-                                    <ChevronRight className="w-4 h-4" />
-                                  )}
+                                  Center
+                                  {sortByCenter === 'asc' && <ArrowUp className="w-3 h-3" />}
+                                  {sortByCenter === 'desc' && <ArrowDown className="w-3 h-3" />}
+                                  {!sortByCenter && <ArrowUpDown className="w-3 h-3 opacity-50" />}
                                 </button>
-                              </td>
-                            )}
-                            <td className="align-middle">{index + 1}</td>
-                            <td className="align-middle pl-3">
-                              <div className="flex items-center gap-2">
-                                {isAdmin() ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigate(`/teachers/${teacher.username || teacher._id}`);
-                                    }}
-                                    className="link link-primary font-semibold hover:underline inline-flex items-center gap-1"
-                                    title="View classroom talk data"
-                                  >
-                                    {teacher.name}
-                                    <ChevronRight className="w-4 h-4" />
-                                  </button>
-                                ) : (
-                                  teacher.name
-                                )}
-                                {isAdmin() && hasChildren && (
-                                  <span className="badge badge-sm badge-secondary">
-                                    {teacherChildren.length}
-                                  </span>
-                                )}
-                                {invitedTeacherEmails.has((teacher.email || "").toLowerCase().trim()) ? (
-                                  <span
-                                    className="btn btn-ghost btn-xs gap-1 ml-2 no-animation pointer-events-none opacity-80 cursor-default border border-base-300"
-                                    title="Invitation already sent for this email"
-                                  >
-                                    Invited
-                                  </span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openInviteModal(teacher);
-                                    }}
-                                    className="btn btn-primary btn-xs gap-1 ml-2"
-                                    title="Send invitation to teacher"
-                                  >
-                                    <Mail className="w-3 h-3" />
-                                    Invite
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                            <td className="align-middle">{teacher.email}</td>
-                            <td className="align-middle">{teacher.education}</td>
-                            <td className="align-middle">{teacher.dateOfBirth ? new Date(teacher.dateOfBirth).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
-                            <td className="align-middle">
-                              <span className="badge badge-primary inline-flex items-center justify-center whitespace-nowrap">
-                                {teacher.center}
-                              </span>
-                            </td>
-                            <td className="align-middle">{getPrimaryLanguageForTeacher(teacher.name) || "—"}</td>
-                            <td className="align-middle" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex gap-2">
-                                <button 
-                                  onClick={() => navigate(`/teachers/edit/${teacher._id}`)}
-                                  className="btn btn-ghost btn-xs"
-                                  title="Edit teacher"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
+                              </th>
+                              <th>
                                 <button
-                                  onClick={() => handleDelete(teacher._id)}
-                                  className="btn btn-ghost btn-xs text-error"
-                                  title="Delete teacher"
+                                  type="button"
+                                  onClick={handleSortByLanguage}
+                                  className="flex items-center gap-1 hover:underline"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  Language
+                                  {sortByLanguage === 'asc' && <ArrowUp className="w-3 h-3" />}
+                                  {sortByLanguage === 'desc' && <ArrowDown className="w-3 h-3" />}
+                                  {!sortByLanguage && <ArrowUpDown className="w-3 h-3 opacity-50" />}
                                 </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ];
+                              </th>
+                              <th>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredTeachers.map((teacher, index) => {
+                              const teacherChildren = getChildrenForTeacher(teacher.name);
+                              const hasChildren = teacherChildren.length > 0;
+                              const isExpanded = expandedTeachers.has(teacher._id);
+                              const isInvited = invitedTeacherEmails.has((teacher.email || "").toLowerCase().trim());
 
-                        // Add children row if expanded (always show for admins, even if no children)
-                        if (isAdmin() && isExpanded) {
-                          rows.push(
-                            <tr key={`${teacher._id}-children`}>
-                              <td colSpan={isAdmin() ? 9 : 8} className="bg-base-200 p-0">
-                                <div className="p-4 pl-12">
-                                  <h4 className="font-semibold mb-3 text-sm text-base-content/70">
-                                    Children Under Supervision ({teacherChildren.length})
-                                  </h4>
-                                  {teacherChildren.length > 0 ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                      {teacherChildren.map((child) => (
-                                        <div
-                                          key={child._id}
-                                          onClick={() => navigate(`/data/child/${child._id}`)}
-                                          className="card bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-base-300 hover:border-primary"
+                              return (
+                                <>
+                                  <tr key={teacher._id} className="hover">
+                                    {isAdmin() && (
+                                      <td>
+                                        {hasChildren ? (
+                                          <button
+                                            onClick={() => toggleTeacherExpansion(teacher._id)}
+                                            className="btn btn-ghost btn-xs btn-circle"
+                                          >
+                                            {isExpanded ? (
+                                              <ChevronDown className="w-4 h-4" />
+                                            ) : (
+                                              <ChevronRight className="w-4 h-4" />
+                                            )}
+                                          </button>
+                                        ) : (
+                                          <span className="w-6"></span>
+                                        )}
+                                      </td>
+                                    )}
+                                    <td>{index + 1}</td>
+                                    <td>
+                                      <div className="flex items-center gap-2">
+                                        {isAdmin() ? (
+                                          <button
+                                            onClick={() => navigate(`/teachers/${teacher.username || teacher._id}`)}
+                                            className="link link-primary font-semibold hover:underline"
+                                          >
+                                            {teacher.name}
+                                          </button>
+                                        ) : (
+                                          <span className="font-semibold">{teacher.name}</span>
+                                        )}
+                                        {hasChildren && (
+                                          <span className="badge badge-secondary badge-sm">
+                                            {teacherChildren.length}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td>{teacher.email}</td>
+                                    <td>{teacher.education}</td>
+                                    <td>
+                                      {teacher.dateOfBirth 
+                                        ? new Date(teacher.dateOfBirth).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric'
+                                          })
+                                        : 'N/A'
+                                      }
+                                    </td>
+                                    <td>
+                                      {teacher.center ? (
+                                        <span className="badge badge-primary">{teacher.center}</span>
+                                      ) : (
+                                        <span className="text-base-content/50">None</span>
+                                      )}
+                                    </td>
+                                    <td>
+                                      <span className="badge badge-info badge-sm">
+                                        {getPrimaryLanguageForTeacher(teacher.name) || "—"}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <div className="flex gap-2">
+                                        <button 
+                                          onClick={() => navigate(`/teachers/edit/${teacher._id}`)}
+                                          className="btn btn-ghost btn-xs"
+                                          title="Edit teacher"
                                         >
-                                          <div className="card-body p-4">
-                                            <div className="flex items-center gap-2">
-                                              <User className="w-4 h-4 text-primary" />
-                                              <h5 className="font-semibold text-sm">{child.name}</h5>
-                                            </div>
-                                            <div className="text-xs text-base-content/60 mt-2">
-                                              {child.dateOfBirth && (
-                                                <p>Age: {(() => {
-                                                  const birthDate = new Date(child.dateOfBirth);
-                                                  const today = new Date();
-                                                  const yearsDiff = today.getFullYear() - birthDate.getFullYear();
-                                                  const monthsDiff = today.getMonth() - birthDate.getMonth();
-                                                  const totalMonths = yearsDiff * 12 + monthsDiff;
-                                                  const finalMonths = today.getDate() < birthDate.getDate() ? Math.max(0, totalMonths - 1) : totalMonths;
-                                                  return `${finalMonths} months`;
-                                                })()}</p>
-                                              )}
-                                              {child.gender && <p>Gender: {child.gender}</p>}
-                                              {child.diagnosis && (
-                                                <p>
-                                                  Diagnosis: <span className={child.diagnosis === "Yes" ? "text-warning" : "text-success"}>{child.diagnosis}</span>
-                                                </p>
-                                              )}
-                                            </div>
-                                            <div className="card-actions justify-end mt-2">
-                                              <button className="btn btn-xs btn-primary">
-                                                View Details
-                                              </button>
-                                            </div>
+                                          <Edit className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDelete(teacher._id)}
+                                          className="btn btn-ghost btn-xs text-error"
+                                          title="Delete teacher"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                        {isInvited ? (
+                                          <span className="btn btn-ghost btn-xs no-animation opacity-80 cursor-default border border-base-300">
+                                            Invited
+                                          </span>
+                                        ) : (
+                                          <button
+                                            onClick={() => openInviteModal(teacher)}
+                                            className="btn btn-primary btn-xs gap-1"
+                                            title="Send invitation"
+                                          >
+                                            <Mail className="w-3 h-3" />
+                                            Invite
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  
+                                  {/* Expanded children details */}
+                                  {isAdmin() && isExpanded && hasChildren && (
+                                    <tr>
+                                      <td colSpan={9} className="bg-base-50 p-0">
+                                        <div className="p-4">
+                                          <h4 className="font-semibold mb-3 text-sm">
+                                            Students Under {teacher.name} ({teacherChildren.length})
+                                          </h4>
+                                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {teacherChildren.map((child) => (
+                                              <div
+                                                key={child._id}
+                                                onClick={() => navigate(`/data/child/${child._id}`)}
+                                                className="p-3 bg-base-100 rounded-lg hover:bg-base-200 cursor-pointer transition-colors border"
+                                              >
+                                                <div className="flex items-center gap-2">
+                                                  <User className="w-4 h-4 text-accent" />
+                                                  <div>
+                                                    <p className="font-medium text-sm">{child.name}</p>
+                                                    <div className="flex gap-2 text-xs text-base-content/60">
+                                                      {child.dateOfBirth && (
+                                                        <span>Age: {(() => {
+                                                          const birthDate = new Date(child.dateOfBirth);
+                                                          const today = new Date();
+                                                          const yearsDiff = today.getFullYear() - birthDate.getFullYear();
+                                                          const monthsDiff = today.getMonth() - birthDate.getMonth();
+                                                          const totalMonths = yearsDiff * 12 + monthsDiff;
+                                                          return `${totalMonths} months`;
+                                                        })()}</span>
+                                                      )}
+                                                      {child.gender && <span>Gender: {child.gender}</span>}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
                                           </div>
                                         </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="alert alert-info">
-                                      <p className="text-sm">No children assigned to this teacher.</p>
-                                    </div>
+                                      </td>
+                                    </tr>
                                   )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        return rows;
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                                </>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
-        </div>
+        </main>
       </div>
 
       {/* Invite Teacher Modal */}
@@ -733,4 +988,3 @@ const TeachersPage = () => {
 };
 
 export default TeachersPage;
-

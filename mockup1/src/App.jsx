@@ -18,6 +18,9 @@ import ParentRegisterPage from './pages/ParentRegisterPage';
 import TeacherRegisterPage from './pages/TeacherRegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import ClassroomsPage from './pages/ClassroomsPage';
+import CreateClassroomForm from './pages/CreateClassroomForm';
+import ClassroomHomePage from './pages/ClassroomHomePage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App = () => {
@@ -31,6 +34,21 @@ const App = () => {
       <Route path="/home" element={
         <ProtectedRoute skipParentHomeRedirect>
           <HomePage />
+        </ProtectedRoute>
+      } />
+      <Route path="/classrooms" element={
+        <ProtectedRoute requiredRole="admin">
+          <ClassroomsPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/classrooms/create" element={
+        <ProtectedRoute excludeRoles={['parent']}>
+          <CreateClassroomForm />
+        </ProtectedRoute>
+      } />
+      <Route path="/classrooms/:id" element={
+        <ProtectedRoute excludeRoles={['parent']}>
+          <ClassroomHomePage />
         </ProtectedRoute>
       } />
       <Route path="/centers" element={

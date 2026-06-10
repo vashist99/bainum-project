@@ -103,7 +103,7 @@ const SemicircularDial = ({ value, max = 200, color, label, description, icon: I
   }
 };
 
-const DotMatrixWPM = ({ monthlyWPM, config }) => {
+const DotMatrixWPM = ({ monthlyWPM, config, subtitle = 'Average WPM by month' }) => {
   const Icon = config?.icon ?? TrendingUp;
   const title = config?.dotMatrixTitle ?? config?.label ?? 'WPM';
   const colorClass = config?.color ?? 'text-blue-600';
@@ -114,7 +114,7 @@ const DotMatrixWPM = ({ monthlyWPM, config }) => {
         <Icon className={`w-6 h-6 ${colorClass}`} />
         <div>
           <h3 className={`font-bold text-lg ${colorClass.replace('600', '800')} dark:${colorClass.replace('600', '200')}`}>{title}</h3>
-          <p className={`text-sm ${colorClass.replace('600', '700')} dark:${colorClass.replace('600', '300')}`}>Average WPM by month</p>
+          <p className={`text-sm ${colorClass.replace('600', '700')} dark:${colorClass.replace('600', '300')}`}>{subtitle}</p>
         </div>
       </div>
       <div className="flex flex-col gap-3">
@@ -156,7 +156,7 @@ const DotMatrixWPM = ({ monthlyWPM, config }) => {
 
 const CATEGORIES = ['science', 'social', 'literature', 'language'];
 
-export function LanguageDevelopmentCharts({ assessments = [], viewMode = 'dotmatrix', title = 'Language Development Analysis', contextSubtitle = null, showWordScores = false, cohortThresholdsByCategory = null }) {
+export function LanguageDevelopmentCharts({ assessments = [], viewMode = 'dotmatrix', title = 'Language Development Analysis', contextSubtitle = null, showWordScores = false, cohortThresholdsByCategory = null, dotMatrixSubtitle = 'Average WPM by month' }) {
   const monthlyWPMByCategory = useMemo(() => {
     const result = {};
     CATEGORIES.forEach((cat) => {
@@ -257,6 +257,7 @@ export function LanguageDevelopmentCharts({ assessments = [], viewMode = 'dotmat
                 key={cat}
                 monthlyWPM={monthlyWPMByCategory[cat]}
                 config={CATEGORY_CONFIG[cat]}
+                subtitle={dotMatrixSubtitle}
               />
             ))}
           </div>

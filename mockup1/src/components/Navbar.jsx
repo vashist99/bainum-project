@@ -1,7 +1,7 @@
-import { Users, BarChart3, LogOut, Building2, UserCircle } from "lucide-react";
+import { Users, BarChart3, LogOut, Building2, UserCircle, Menu, Home, ChevronRight, Bell } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
-const Navbar = () => {
+const Navbar = ({ onToggleSidebar, showSidebar = false, breadcrumbs = [] }) => {
   const { user, logout, isAdmin, isParent, isTeacher } = useAuth();
 
   const handleLogout = () => {
@@ -10,14 +10,51 @@ const Navbar = () => {
   };
 
   return (
-    <div className="navbar bg-base-100 shadow-lg border-b border-base-300">
+    <div className="navbar bg-base-100 shadow-lg border-b border-base-300 sticky top-0 z-30">
       <div className="navbar-start">
-        <div className="dropdown">
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className="btn btn-ghost btn-circle lg:hidden"
+            aria-label={showSidebar ? "Close sidebar" : "Open sidebar"}
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+        
+        {/* Breadcrumbs for larger screens */}
+        {breadcrumbs && breadcrumbs.length > 0 && (
+          <div className="hidden lg:flex items-center gap-2 ml-4">
+            <Home className="w-4 h-4 text-base-content/50" />
+            {breadcrumbs.map((crumb, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <ChevronRight className="w-3 h-3 text-base-content/30" />
+                {crumb.href ? (
+                  <a 
+                    href={crumb.href} 
+                    className="text-sm hover:text-primary transition-colors"
+                  >
+                    {crumb.label}
+                  </a>
+                ) : (
+                  <span className="text-sm text-base-content/70 font-medium">
+                    {crumb.label}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Mobile dropdown — only on pages WITHOUT a sidebar (when a sidebar
+            exists, its hamburger toggle covers mobile navigation and these
+            links would be redundant). */}
+        {!onToggleSidebar && <div className="dropdown">
           <button 
             type="button"
             tabIndex={0} 
             role="button" 
-            className="btn btn-ghost lg:hidden"
+            className="btn btn-ghost lg:hidden ml-2"
             aria-label="Open navigation menu"
             aria-expanded="false"
             aria-controls="mobile-menu"
@@ -79,13 +116,21 @@ const Navbar = () => {
               </li>
             )}
           </ul>
-        </div>
-        <a href="/home" className="btn btn-ghost text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          Bainum Project
+        </div>}
+        <a href="/home" className="btn btn-ghost text-lg lg:text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent ml-2 lg:ml-0">
+          {/* Show abbreviated on mobile when sidebar toggle is present */}
+          <span className={onToggleSidebar ? "lg:hidden" : ""}>
+            BP
+          </span>
+          <span className={onToggleSidebar ? "hidden lg:inline" : ""}>
+            Bainum Project
+          </span>
         </a>
       </div>
       
-      <div className="navbar-center hidden lg:flex">
+      {/* Top nav tabs — only on pages WITHOUT a sidebar; sidebar pages
+          already list every destination, so the tabs would be redundant. */}
+      {!onToggleSidebar && <div className="navbar-center hidden lg:flex">
         <ul className="menu menu-horizontal px-1 gap-2">
           {isTeacher() && (
             <li>
@@ -120,9 +165,34 @@ const Navbar = () => {
             </li>
           )}
         </ul>
-      </div>
-      
+      </div>}
+
       <div className="navbar-end">
+        {/* Notifications */}
+        <div className="dropdown dropdown-end mr-2">
+          <button 
+            type="button"
+            className="btn btn-ghost btn-circle"
+            aria-label="Notifications"
+          >
+            <div className="indicator">
+              <Bell className="w-5 h-5" />
+              <span className="badge badge-xs badge-primary indicator-item"></span>
+            </div>
+          </button>
+          <div className="dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-80">
+            <div className="p-4">
+              <h3 className="font-semibold text-sm mb-3">Notifications</h3>
+              <div className="space-y-2">
+                <div className="text-sm text-base-content/60 text-center py-4">
+                  No new notifications
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* User Menu */}
         <div className="dropdown dropdown-end">
           <button 
             type="button"

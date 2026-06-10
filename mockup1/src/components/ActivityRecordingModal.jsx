@@ -20,6 +20,8 @@ import {
 } from "../utils/ragHighlightSegments.js";
 import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
 import { CUSTOM_ACTIVITY_VALUE } from "../utils/activities.js";
+import { getLocationsForRole, getDefaultLocationForRole } from "../utils/locations.js";
+import VettedLabelSelect from "./VettedLabelSelect.jsx";
 
 const PROCESSING_MESSAGES = [
   { text: "Uploading your audio file...", icon: "📤" },
@@ -76,6 +78,11 @@ export default function ActivityRecordingModal({ role, onClose, onSuccess }) {
   const [customActivity, setCustomActivity] = useState("");
   const [validatingActivity, setValidatingActivity] = useState(false);
   const [activityValidation, setActivityValidation] = useState(null); // { accepted, reason, normalized }
+  // { value, ready } from the location picker — custom locations must pass AI vetting.
+  const [locationState, setLocationState] = useState({
+    value: getDefaultLocationForRole(role),
+    ready: true,
+  });
 
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioBlobMime, setAudioBlobMime] = useState("");
@@ -298,6 +305,14 @@ export default function ActivityRecordingModal({ role, onClose, onSuccess }) {
         return false;
       }
     }
+    if (!locationState.ready) {
+      toast.error("Custom location must be validated before recording.");
+      return false;
+    }
+    if (!locationState.value) {
+      toast.error("Choose or enter a location.");
+      return false;
+    }
     if (!audioBlob && !audioFile) {
       toast.error("Record or upload an audio clip first.");
       return false;
@@ -324,6 +339,7 @@ export default function ActivityRecordingModal({ role, onClose, onSuccess }) {
       formData.append("audio", audioFile);
     }
     formData.append("activity", activity);
+    formData.append("location", locationState.value);
     formData.append("recordingDate", recordingDate);
 
     setUploading(true);
@@ -390,7 +406,12 @@ export default function ActivityRecordingModal({ role, onClose, onSuccess }) {
             Review Activity Recording
           </h3>
           <p className="text-sm text-base-content/70 mb-3 break-words">
-            Activity: <strong>{assessment.activity}</strong>{" "}
+            Activity: <strong>{assessment.activity}</strong>
+            {assessment.location && (
+              <>
+                {" "}· Location: <strong>{assessment.location}</strong>
+              </>
+            )}{" "}
             <span className="badge badge-sm badge-outline align-middle">
               {assessment.activityContext === "school" ? "At school" : "At home"}
             </span>
@@ -508,6 +529,8 @@ export default function ActivityRecordingModal({ role, onClose, onSuccess }) {
   const canUpload =
     !!resolvedActivityText() &&
     (selectedActivityKey !== CUSTOM_ACTIVITY_VALUE || customAccepted) &&
+    !!locationState.value &&
+    locationState.ready &&
     (!!audioBlob || !!audioFile) &&
     !uploading;
 
@@ -627,6 +650,25 @@ export default function ActivityRecordingModal({ role, onClose, onSuccess }) {
             )}
           </div>
         )}
+
+        {/* Location picker (custom entries vetted by AI, same as activities) */}
+        <VettedLabelSelect
+          label="Location"
+          labelAlt={context === "school" ? "School context" : "Home context"}
+          options={getLocationsForRole(role)}
+          customOptionLabel="Other (please specify) — validated by AI"
+          customPlaceholder={
+            context === "school"
+              ? "e.g., School garden, Gymnasium"
+              : "e.g., Grandma's backyard, Community pool"
+          }
+          customHint={`Must fit a ${context === "school" ? "school" : "family"} setting`}
+          validatePath="/api/locations/validate"
+          payloadKey="location"
+          defaultValue={getDefaultLocationForRole(role)}
+          disabled={uploading}
+          onStateChange={setLocationState}
+        />
 
         {/* Recorder — when recording, a big visible banner; otherwise tap-friendly start/clear */}
         <div className="form-control w-full mb-3">

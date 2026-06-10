@@ -4,6 +4,9 @@ import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { highlightRAGSegments, getSegmentsForHighlighting } from "../utils/ragHighlightSegments.js";
 import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
+import { getActivityGroupsForRole } from "../utils/activities.js";
+import { getLocationsForRole, getDefaultLocationForRole } from "../utils/locations.js";
+import VettedLabelSelect from "./VettedLabelSelect.jsx";
 
 const PROCESSING_MESSAGES = [
   { text: "Uploading your audio file...", icon: "📤" },
@@ -18,7 +21,7 @@ const PROCESSING_MESSAGES = [
   { text: "Almost there! Preparing your results...", icon: "🎯" },
 ];
 
-export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, preselectedTeacherId, preselectedCenter }) {
+export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, preselectedTeacherId, preselectedCenter, classroomId }) {
   const [centers, setCenters] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [selectedCenter, setSelectedCenter] = useState(preselectedCenter || "");
@@ -26,6 +29,12 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
   const isTeacherPreselected = !!(preselectedTeacherId && preselectedCenter);
   const [audioFile, setAudioFile] = useState(null);
   const [recordingDate, setRecordingDate] = useState(new Date().toISOString().split("T")[0]);
+  // Classroom recordings are always school-context; custom entries are AI-vetted.
+  const [activityState, setActivityState] = useState({ value: "", ready: false });
+  const [locationState, setLocationState] = useState({
+    value: getDefaultLocationForRole("teacher"),
+    ready: true,
+  });
   const [uploading, setUploading] = useState(false);
   const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
   const [showTranscriptModal, setShowTranscriptModal] = useState(false);
@@ -94,6 +103,22 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
       toast.error("Please select a teacher");
       return;
     }
+    if (!activityState.value || !activityState.ready) {
+      toast.error(
+        activityState.value || activityState.ready
+          ? "Please choose an activity"
+          : "Custom activity must be validated before uploading."
+      );
+      return;
+    }
+    if (!locationState.value || !locationState.ready) {
+      toast.error(
+        locationState.ready
+          ? "Please choose a location"
+          : "Custom location must be validated before uploading."
+      );
+      return;
+    }
 
     setUploading(true);
     abortControllerRef.current = new AbortController();
@@ -101,6 +126,14 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
       const formData = new FormData();
       formData.append("audio", audioFile);
       formData.append("recordingDate", recordingDate);
+      // Classroom-scoped recording: the backend authorizes (lead/assistant/
+      // admin), stamps classroomId on the draft, and the accept payload then
+      // carries it through so the fan-out targets classroom members only.
+      if (classroomId) {
+        formData.append("classroomId", classroomId);
+      }
+      formData.append("activity", activityState.value);
+      formData.append("location", locationState.value);
       if (isAdmin) {
         const teacherIdToUse = isTeacherPreselected ? preselectedTeacherId : selectedTeacher;
         const centerToUse = isTeacherPreselected ? preselectedCenter : selectedCenter;
@@ -184,10 +217,21 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
       <div className="modal modal-open">
         <div className="modal-backdrop bg-black/50" onClick={handleReject} aria-hidden="true" />
         <div className="modal-box max-w-3xl w-[95vw] sm:w-full max-h-[92vh] overflow-y-auto relative z-[100] bg-base-100 p-4 sm:p-6">
-          <h3 className="font-bold text-xl sm:text-2xl mb-3 sm:mb-4 flex items-center gap-2">
+          <h3 className="font-bold text-xl sm:text-2xl mb-2 flex items-center gap-2">
             <FileText className="w-6 h-6 text-primary shrink-0" />
             Review Transcript
           </h3>
+          {(pendingAssessment?.activity || pendingAssessment?.location) && (
+            <p className="text-sm text-base-content/70 break-words">
+              {pendingAssessment.activity && (
+                <>Activity: <strong>{pendingAssessment.activity}</strong></>
+              )}
+              {pendingAssessment.activity && pendingAssessment.location && " · "}
+              {pendingAssessment.location && (
+                <>Location: <strong>{pendingAssessment.location}</strong></>
+              )}
+            </p>
+          )}
           <div className="divider my-2" />
           <div className="mb-4">
             <label className="label py-1">
@@ -327,6 +371,34 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
           </>
         )}
 
+        {/* Recording details: school-context activity + location, AI-vetted customs */}
+        <VettedLabelSelect
+          label="Activity"
+          labelAlt="School context"
+          groups={getActivityGroupsForRole("teacher")}
+          customOptionLabel="+ Add a custom activity (validated by AI)"
+          customPlaceholder="e.g., Circle time, Story hour, Music & movement"
+          customHint="Must fit a school setting"
+          validatePath="/api/activities/validate"
+          payloadKey="activity"
+          disabled={uploading}
+          onStateChange={setActivityState}
+        />
+
+        <VettedLabelSelect
+          label="Location"
+          labelAlt="School context"
+          options={getLocationsForRole("teacher")}
+          customOptionLabel="Other (please specify) — validated by AI"
+          customPlaceholder="e.g., School garden, Gymnasium"
+          customHint="Must fit a school setting"
+          validatePath="/api/locations/validate"
+          payloadKey="location"
+          defaultValue={getDefaultLocationForRole("teacher")}
+          disabled={uploading}
+          onStateChange={setLocationState}
+        />
+
         <div className="form-control w-full mb-3">
           <label className="label py-1">
             <span className="label-text font-semibold">Select Audio File</span>
@@ -390,7 +462,15 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
           <button
             onClick={handleUpload}
             className="btn btn-primary gap-2 w-full sm:w-auto"
-            disabled={!audioFile || uploading || (isAdmin && !isTeacherPreselected && !selectedTeacher)}
+            disabled={
+              !audioFile ||
+              uploading ||
+              (isAdmin && !isTeacherPreselected && !selectedTeacher) ||
+              !activityState.value ||
+              !activityState.ready ||
+              !locationState.value ||
+              !locationState.ready
+            }
           >
             {uploading ? (
               <>Processing...</>

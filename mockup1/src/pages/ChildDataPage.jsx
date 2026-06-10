@@ -910,7 +910,8 @@ const ChildDataPage = () => {
                               minute: '2-digit'
                             });
                             const activityLine = assessment.activity ? `Activity: ${assessment.activity}\n` : '';
-                            return `=== Transcript from ${dateStr} ===\n${activityLine}${assessment.uploadedBy ? `Uploaded by: ${assessment.uploadedBy}\n` : ''}${assessment.transcript}\n\n`;
+                            const locationLine = assessment.location ? `Location: ${assessment.location}\n` : '';
+                            return `=== Transcript from ${dateStr} ===\n${activityLine}${locationLine}${assessment.uploadedBy ? `Uploaded by: ${assessment.uploadedBy}\n` : ''}${assessment.transcript}\n\n`;
                           });
                         
                         const allTranscriptsText = transcriptsWithDates.join('\n');
@@ -971,6 +972,14 @@ const ChildDataPage = () => {
                                     }
                                   >
                                     {assessment.activity}
+                                  </span>
+                                )}
+                                {assessment.location && (
+                                  <span
+                                    className="badge badge-outline badge-secondary badge-sm font-normal"
+                                    title="Recording location"
+                                  >
+                                    📍 {assessment.location}
                                   </span>
                                 )}
                               </h3>
