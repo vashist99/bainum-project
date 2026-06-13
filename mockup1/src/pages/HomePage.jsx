@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import Navbar from "../components/Navbar";
-import Sidebar from "../components/Sidebar";
+import AppLayout from "../components/AppLayout";
 import ClassroomCard from "../components/ClassroomCard";
 import { Sparkles, Radio, ArrowRight, Plus, School, LayoutGrid } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,7 +12,6 @@ const HomePage = () => {
   const navigate = useNavigate();
   const { isAdmin, isParent, isTeacher, user } = useAuth();
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [classrooms, setClassrooms] = useState([]);
   const [classroomsLoading, setClassroomsLoading] = useState(false);
 
@@ -38,27 +36,9 @@ const HomePage = () => {
     if (primary) navigate(`/data/child/${primary}`);
   };
 
-  const handleSidebarToggle = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
   return (
-    <div className="min-h-screen bg-base-200 flex">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onToggle={handleSidebarToggle}
-        currentPath="/home"
-      />
-
-      <div className="flex-1 flex flex-col lg:ml-0">
-        <Navbar
-          onToggleSidebar={handleSidebarToggle}
-          showSidebar={sidebarOpen}
-          breadcrumbs={breadcrumbs}
-        />
-
-        <main className="flex-1 overflow-auto">
-          <div className="p-4 sm:p-6">
+    <AppLayout breadcrumbs={breadcrumbs}>
+      <div className="p-4 sm:p-6">
             {/* Welcome Header */}
             <div className="mb-8">
               <div className="flex items-center gap-4 mb-4">
@@ -239,9 +219,6 @@ const HomePage = () => {
               </>
             )}
           </div>
-        </main>
-      </div>
-
 
       {/* Parent activity recording modal (opened from the Record Activity card) */}
       {showActivityModal && (
@@ -251,7 +228,7 @@ const HomePage = () => {
           onClose={() => setShowActivityModal(false)}
         />
       )}
-    </div>
+    </AppLayout>
   );
 };
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import Navbar from "../components/Navbar";
-import Sidebar from "../components/Sidebar";
+import AppLayout from "../components/AppLayout";
 import { School, ArrowLeft, Plus } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
@@ -10,7 +9,6 @@ import { useAuth } from "../contexts/AuthContext";
 const CreateClassroomForm = () => {
   const navigate = useNavigate();
   const { user, isAdmin, isTeacher } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [name, setName] = useState("");
   const [centers, setCenters] = useState([]);
@@ -105,21 +103,7 @@ const CreateClassroomForm = () => {
   };
 
   return (
-    <div className="min-h-screen bg-base-200 flex">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        currentPath="/classrooms/create"
-      />
-
-      <div className="flex-1 flex flex-col lg:ml-0">
-        <Navbar
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          showSidebar={sidebarOpen}
-          breadcrumbs={breadcrumbs}
-        />
-
-        <main className="flex-1 overflow-auto">
+    <AppLayout breadcrumbs={breadcrumbs}>
           <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full">
             <button
               onClick={() => navigate(-1)}
@@ -289,9 +273,7 @@ const CreateClassroomForm = () => {
               </div>
             </div>
           </div>
-        </main>
-      </div>
-    </div>
+    </AppLayout>
   );
 };
 

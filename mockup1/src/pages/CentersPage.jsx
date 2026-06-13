@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import Navbar from "../components/Navbar";
-import Sidebar from "../components/Sidebar";
+import AppLayout from "../components/AppLayout";
 import { CardLoading, EmptyCenters } from "../components/LoadingStates";
 import { Plus, Edit, Trash2, ChevronDown, ChevronRight, Building2, Users, Mail, MapPin, Phone, Search, Filter } from "lucide-react";
 import axios from "../lib/axios";
@@ -15,7 +14,6 @@ const CentersPage = () => {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedCenters, setExpandedCenters] = useState(new Set());
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("cards"); // "cards" or "table"
   
@@ -94,10 +92,6 @@ const CentersPage = () => {
     center.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     center.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
-  const handleSidebarToggle = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
   
   const handleAddCenter = () => {
     navigate("/centers/add");
@@ -223,22 +217,7 @@ const CentersPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-base-200 flex">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onToggle={handleSidebarToggle}
-        currentPath="/centers"
-      />
-      
-      <div className="flex-1 flex flex-col lg:ml-0">
-        <Navbar 
-          onToggleSidebar={handleSidebarToggle}
-          showSidebar={sidebarOpen}
-          breadcrumbs={breadcrumbs}
-        />
-        
-        <main className="flex-1 overflow-auto">
-
+    <AppLayout breadcrumbs={breadcrumbs}>
           <div className="p-6">
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
@@ -487,9 +466,7 @@ const CentersPage = () => {
               </>
             )}
           </div>
-        </main>
-      </div>
-    </div>
+    </AppLayout>
   );
 };
 

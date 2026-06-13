@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
-import Navbar from "../components/Navbar";
+import AppLayout from "../components/AppLayout";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
 import axios from "../lib/axios";
@@ -101,21 +101,18 @@ const EditCenterForm = () => {
 
   if (loadingCenter) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <Navbar />
+      <AppLayout>
         <div className="container mx-auto p-6 max-w-2xl">
           <div className="flex justify-center items-center h-64">
             <span className="loading loading-spinner loading-lg"></span>
           </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-base-200">
-      <Navbar />
-
+    <AppLayout>
       <div className="container mx-auto p-6 max-w-2xl">
         <div className="flex items-center gap-4 mb-6">
           <button
@@ -229,7 +226,7 @@ const EditCenterForm = () => {
           </div>
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 };
 

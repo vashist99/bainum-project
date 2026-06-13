@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import Navbar from "../components/Navbar";
+import AppLayout from "../components/AppLayout";
 import { Users, ChevronRight, UserPlus, Mail, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown, CheckSquare } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
@@ -371,9 +371,7 @@ const DataPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-base-200">
-      <Navbar />
-
+    <AppLayout>
       <div className="container mx-auto p-4 md:p-6">
         {/* DEBUG INFO - REMOVE LATER */}
         {/* <div className="alert alert-warning mb-4">
@@ -857,7 +855,7 @@ const DataPage = () => {
           </div>
         )}
       </div>
-    </div>
+    </AppLayout>
   );
 };
 

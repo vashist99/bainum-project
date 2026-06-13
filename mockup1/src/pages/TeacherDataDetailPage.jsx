@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
-import Navbar from "../components/Navbar";
+import AppLayout from "../components/AppLayout";
 import { ArrowLeft, User, Mail, Building2, FileText, Calendar, Download, Upload, Trash2, Shield } from "lucide-react";
 import axios from "../lib/axios";
 import { LanguageDevelopmentCharts } from "../components/LanguageDevelopmentCharts";
@@ -123,21 +123,19 @@ const TeacherDataDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <Navbar />
+      <AppLayout>
         <div className="container mx-auto p-6">
           <div className="flex justify-center items-center h-64">
             <span className="loading loading-spinner loading-lg" />
           </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   if (isParent() && parentAccessDenied && teacherStub) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <Navbar />
+      <AppLayout>
         <div className="container mx-auto p-6 max-w-lg">
           <button type="button" onClick={() => navigate(`/data/child/${getPrimaryChildId(user)}`)} className="btn btn-ghost btn-circle mb-4">
             <ArrowLeft className="w-5 h-5" />
@@ -161,14 +159,13 @@ const TeacherDataDetailPage = () => {
             </div>
           </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   if (!teacher) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <Navbar />
+      <AppLayout>
         <div className="container mx-auto p-6">
           <div className="alert alert-warning">
             <span>Teacher not found</span>
@@ -177,14 +174,12 @@ const TeacherDataDetailPage = () => {
             Go back
           </button>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-base-200">
-      <Navbar />
-
+    <AppLayout>
       <div className="container mx-auto p-6 max-w-6xl">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
@@ -425,7 +420,7 @@ const TeacherDataDetailPage = () => {
           preselectedCenter={isAdmin() ? teacher.center : undefined}
         />
       )}
-    </div>
+    </AppLayout>
   );
 };
 

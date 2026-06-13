@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import Navbar from "../components/Navbar";
-import Sidebar from "../components/Sidebar";
+import AppLayout from "../components/AppLayout";
 import { CardLoading, EmptyTeachers } from "../components/LoadingStates";
 import { Plus, Edit, Trash2, ChevronDown, ChevronRight, User, Mail, Building2, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from "lucide-react";
 import axios from "../lib/axios";
@@ -25,7 +24,6 @@ const TeachersPage = () => {
   const [sortByLanguage, setSortByLanguage] = useState(null); // null | 'asc' | 'desc'
   /** Lowercased emails that already have a teacher invitation sent */
   const [invitedTeacherEmails, setInvitedTeacherEmails] = useState(() => new Set());
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("cards");
 
@@ -299,10 +297,6 @@ const TeachersPage = () => {
     }
   };
   
-  const handleSidebarToggle = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-  
   const handleAddTeacher = () => {
     navigate("/teachers/add");
   };
@@ -494,21 +488,7 @@ const TeachersPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-base-200 flex">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onToggle={handleSidebarToggle}
-        currentPath="/teachers"
-      />
-      
-      <div className="flex-1 flex flex-col lg:ml-0">
-        <Navbar 
-          onToggleSidebar={handleSidebarToggle}
-          showSidebar={sidebarOpen}
-          breadcrumbs={breadcrumbs}
-        />
-        
-        <main className="flex-1 overflow-auto">
+    <AppLayout breadcrumbs={breadcrumbs}>
           <div className="p-6">
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
@@ -912,8 +892,6 @@ const TeachersPage = () => {
               </>
             )}
           </div>
-        </main>
-      </div>
 
       {/* Invite Teacher Modal */}
       {showInviteModal && selectedTeacherForInvite && (
@@ -983,7 +961,7 @@ const TeachersPage = () => {
           <div className="modal-backdrop" onClick={() => !sendingInvite && setShowInviteModal(false)}></div>
         </div>
       )}
-    </div>
+    </AppLayout>
   );
 };
 

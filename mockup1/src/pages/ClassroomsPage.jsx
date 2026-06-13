@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import Navbar from "../components/Navbar";
-import Sidebar from "../components/Sidebar";
+import AppLayout from "../components/AppLayout";
 import ClassroomCard from "../components/ClassroomCard";
 import { Plus, School, Search } from "lucide-react";
 import axios from "../lib/axios";
@@ -11,7 +10,6 @@ const ClassroomsPage = () => {
   const navigate = useNavigate();
   const [classrooms, setClassrooms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const breadcrumbs = [
@@ -47,22 +45,8 @@ const ClassroomsPage = () => {
     : classrooms;
 
   return (
-    <div className="min-h-screen bg-base-200 flex">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        currentPath="/classrooms"
-      />
-
-      <div className="flex-1 flex flex-col lg:ml-0">
-        <Navbar
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          showSidebar={sidebarOpen}
-          breadcrumbs={breadcrumbs}
-        />
-
-        <main className="flex-1 overflow-auto">
-          <div className="p-4 sm:p-6">
+    <AppLayout breadcrumbs={breadcrumbs}>
+      <div className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
               <div className="flex items-center gap-3">
                 <div className="bg-primary/10 p-3 rounded-xl">
@@ -133,10 +117,8 @@ const ClassroomsPage = () => {
                 </div>
               </div>
             )}
-          </div>
-        </main>
       </div>
-    </div>
+    </AppLayout>
   );
 };
 

@@ -1,14 +1,12 @@
 import { useNavigate } from "react-router";
-import Navbar from "../components/Navbar";
+import AppLayout from "../components/AppLayout";
 import { ArrowLeft } from "lucide-react";
 
 const AddDataForm = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-base-200">
-      <Navbar />
-
+    <AppLayout>
       <div className="container mx-auto p-6 max-w-2xl">
         <div className="flex items-center gap-4 mb-6">
           <button
@@ -33,7 +31,7 @@ const AddDataForm = () => {
           </div>
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 };
 

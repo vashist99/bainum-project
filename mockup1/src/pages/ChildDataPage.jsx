@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
-import Navbar from "../components/Navbar";
+import AppLayout from "../components/AppLayout";
 import { ArrowLeft, User, Calendar, Languages, Stethoscope, Users, FileText, BookOpen, MessageCircle, Microscope, Brain, Plus, Trash2, Download, Mail } from "lucide-react";
 import { LanguageDevelopmentCharts } from "../components/LanguageDevelopmentCharts";
 import axios from "../lib/axios";
@@ -369,21 +369,19 @@ const ChildDataPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <Navbar />
+      <AppLayout>
         <div className="container mx-auto p-6">
           <div className="flex justify-center items-center h-64">
             <span className="loading loading-spinner loading-lg"></span>
           </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   if (isTeacher() && teacherAccessDenied && childPreview) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <Navbar />
+      <AppLayout>
         <div className="container mx-auto p-4 md:p-6 max-w-2xl">
           <button
             type="button"
@@ -434,27 +432,24 @@ const ChildDataPage = () => {
             </div>
           </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   if (!child) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <Navbar />
+      <AppLayout>
         <div className="container mx-auto p-6">
           <div className="alert alert-warning">
             <span>Child not found</span>
           </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-base-200">
-      <Navbar />
-
+    <AppLayout>
       <div className="container mx-auto p-4 md:p-6 max-w-6xl">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -1066,7 +1061,7 @@ const ChildDataPage = () => {
         )}
 
       </div>
-    </div>
+    </AppLayout>
   );
 };
 

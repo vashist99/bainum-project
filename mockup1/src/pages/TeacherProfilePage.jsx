@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Navigate } from "react-router";
-import Navbar from "../components/Navbar";
+import AppLayout from "../components/AppLayout";
 import { User, Mail, Building2, Mic, FileText, Calendar, Download, Trash2 } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
@@ -72,21 +72,18 @@ const TeacherProfilePage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <Navbar />
+      <AppLayout>
         <div className="container mx-auto p-6">
           <div className="flex justify-center items-center h-64">
             <span className="loading loading-spinner loading-lg" />
           </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-base-200">
-      <Navbar />
-
+    <AppLayout>
       <div className="container mx-auto p-6 max-w-6xl">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -309,7 +306,7 @@ const TeacherProfilePage = () => {
           onClose={() => setShowUploadModal(false)}
         />
       )}
-    </div>
+    </AppLayout>
   );
 };
 

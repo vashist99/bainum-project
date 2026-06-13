@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import Navbar from "../components/Navbar";
+import AppLayout from "../components/AppLayout";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
 import axios from "../lib/axios";
@@ -67,9 +67,7 @@ const AddCenterForm = () => {
   };
 
   return (
-    <div className="min-h-screen bg-base-200">
-      <Navbar />
-
+    <AppLayout>
       <div className="container mx-auto p-6 max-w-2xl">
         <div className="flex items-center gap-4 mb-6">
           <button
@@ -183,7 +181,7 @@ const AddCenterForm = () => {
           </div>
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 };
 
