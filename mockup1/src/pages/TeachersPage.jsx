@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import AppLayout from "../components/AppLayout";
 import { CardLoading, EmptyTeachers } from "../components/LoadingStates";
-import { Plus, Edit, Trash2, ChevronDown, ChevronRight, User, Mail, Building2, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronDown, ChevronRight, User, Users, Mail, Building2, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
