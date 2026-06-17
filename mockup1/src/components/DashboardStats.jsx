@@ -120,10 +120,10 @@ const DashboardStats = ({ onQuickAction }) => {
         const totalTeachers = teachers.length;
         const totalChildren = children.length;
         
-        // Filter children based on user role
-        const relevantChildren = isTeacher() 
-          ? children.filter(child => child.leadTeacher === user?.name)
-          : children;
+        // For teachers, the /api/children endpoint already returns only
+        // children supervised via classroom membership; no further
+        // client-side filter is required.
+        const relevantChildren = children;
 
         const activeRecordings = relevantChildren.filter(child => 
           child.assessments && child.assessments.length > 0

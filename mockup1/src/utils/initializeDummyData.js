@@ -60,7 +60,7 @@ export const initializeDummyData = () => {
         gender: "Female",
         diagnosis: "No",
         primaryLanguage: "English",
-        leadTeacher: "Sarah Johnson",
+        center: "Center A",
       },
       {
         id: 102,
@@ -70,7 +70,7 @@ export const initializeDummyData = () => {
         gender: "Male",
         diagnosis: "Yes",
         primaryLanguage: "English",
-        leadTeacher: "Sarah Johnson",
+        center: "Center A",
       },
       {
         id: 103,
@@ -80,7 +80,7 @@ export const initializeDummyData = () => {
         gender: "Female",
         diagnosis: "No",
         primaryLanguage: "Spanish",
-        leadTeacher: "Sarah Johnson",
+        center: "Center A",
       },
       // Children for Michael Chen
       {
@@ -91,7 +91,7 @@ export const initializeDummyData = () => {
         gender: "Male",
         diagnosis: "No",
         primaryLanguage: "English",
-        leadTeacher: "Michael Chen",
+        center: "Center A",
       },
       {
         id: 105,
@@ -101,7 +101,7 @@ export const initializeDummyData = () => {
         gender: "Female",
         diagnosis: "Yes",
         primaryLanguage: "Spanish",
-        leadTeacher: "Michael Chen",
+        center: "Center A",
       },
       {
         id: 106,
@@ -111,7 +111,7 @@ export const initializeDummyData = () => {
         gender: "Male",
         diagnosis: "No",
         primaryLanguage: "Mandarin",
-        leadTeacher: "Michael Chen",
+        center: "Center A",
       },
       // Children for Emily Rodriguez
       {
@@ -122,7 +122,7 @@ export const initializeDummyData = () => {
         gender: "Female",
         diagnosis: "Yes",
         primaryLanguage: "English",
-        leadTeacher: "Emily Rodriguez",
+        center: "Center B",
       },
       {
         id: 108,
@@ -132,7 +132,7 @@ export const initializeDummyData = () => {
         gender: "Male",
         diagnosis: "No",
         primaryLanguage: "English",
-        leadTeacher: "Emily Rodriguez",
+        center: "Center B",
       },
       {
         id: 109,
@@ -142,7 +142,7 @@ export const initializeDummyData = () => {
         gender: "Female",
         diagnosis: "Yes",
         primaryLanguage: "Spanish",
-        leadTeacher: "Emily Rodriguez",
+        center: "Center B",
       },
       {
         id: 110,
@@ -152,7 +152,7 @@ export const initializeDummyData = () => {
         gender: "Male",
         diagnosis: "No",
         primaryLanguage: "English",
-        leadTeacher: "Emily Rodriguez",
+        center: "Center B",
       },
       // Children for David Patel
       {
@@ -163,7 +163,7 @@ export const initializeDummyData = () => {
         gender: "Female",
         diagnosis: "No",
         primaryLanguage: "English",
-        leadTeacher: "David Patel",
+        center: "Center B",
       },
       {
         id: 112,
@@ -173,7 +173,7 @@ export const initializeDummyData = () => {
         gender: "Male",
         diagnosis: "Yes",
         primaryLanguage: "English",
-        leadTeacher: "David Patel",
+        center: "Center B",
       },
       {
         id: 113,
@@ -183,7 +183,7 @@ export const initializeDummyData = () => {
         gender: "Female",
         diagnosis: "No",
         primaryLanguage: "French",
-        leadTeacher: "David Patel",
+        center: "Center B",
       },
     ];
 

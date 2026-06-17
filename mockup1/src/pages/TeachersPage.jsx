@@ -12,6 +12,7 @@ const TeachersPage = () => {
   const { isAdmin } = useAuth();
   const [teachers, setTeachers] = useState([]);
   const [children, setChildren] = useState([]);
+  const [classrooms, setClassrooms] = useState([]);
   const [centers, setCenters] = useState([]);
   const [selectedCenter, setSelectedCenter] = useState("");
   const [loading, setLoading] = useState(true);
@@ -66,22 +67,27 @@ const TeachersPage = () => {
     fetchTeachers();
   }, []);
 
-  // Load children from API if user is admin
+  // Load children + classrooms from API if user is admin. Both are needed
+  // to materialize the per-teacher children list now that membership is
+  // expressed via classrooms instead of Child.leadTeacher.
   useEffect(() => {
-    const fetchChildren = async () => {
-      if (isAdmin()) {
-        try {
-          const response = await axios.get("/api/children");
-          const childrenList = response.data.children || [];
-          setChildren(childrenList);
-        } catch (error) {
-          console.error("Error fetching children:", error);
-          setChildren([]);
-        }
+    const fetchChildrenAndClassrooms = async () => {
+      if (!isAdmin()) return;
+      try {
+        const [childRes, classroomRes] = await Promise.all([
+          axios.get("/api/children"),
+          axios.get("/api/classrooms"),
+        ]);
+        setChildren(childRes.data.children || []);
+        setClassrooms(classroomRes.data.classrooms || []);
+      } catch (error) {
+        console.error("Error fetching children/classrooms:", error);
+        setChildren([]);
+        setClassrooms([]);
       }
     };
 
-    fetchChildren();
+    fetchChildrenAndClassrooms();
   }, [isAdmin]);
 
   // Load centers from API if user is admin
@@ -126,8 +132,8 @@ const TeachersPage = () => {
     }
     if (sortByLanguage) {
       list = [...list].sort((a, b) => {
-        const la = getPrimaryLanguageForTeacher(a.name).toLowerCase();
-        const lb = getPrimaryLanguageForTeacher(b.name).toLowerCase();
+        const la = getPrimaryLanguageForTeacher(a).toLowerCase();
+        const lb = getPrimaryLanguageForTeacher(b).toLowerCase();
         const cmp = la.localeCompare(lb);
         return sortByLanguage === 'asc' ? cmp : -cmp;
       });
@@ -168,20 +174,37 @@ const TeachersPage = () => {
     setExpandedTeachers(newExpanded);
   };
 
-  const getChildrenForTeacher = (teacherName) => {
+  /**
+   * Children supervised by the given teacher object (id-matched against any
+   * classroom where they are the lead or assistant). Replaces the prior
+   * leadTeacher-name string match.
+   */
+  const getChildrenForTeacher = (teacher) => {
     if (!isAdmin()) return [];
-    const filtered = children.filter(child => {
-      // Match by exact name or trim whitespace
-      const childLeadTeacher = child.leadTeacher?.trim() || '';
-      const teacherNameTrimmed = teacherName?.trim() || '';
-      return childLeadTeacher === teacherNameTrimmed;
-    });
-    return filtered;
+    if (!teacher) return [];
+    const teacherId =
+      typeof teacher === "string"
+        ? null
+        : String(teacher._id ?? teacher.id ?? "");
+    if (!teacherId) return [];
+    // Set of child ObjectId strings enrolled in any classroom this teacher
+    // leads or assists.
+    const childIdSet = new Set();
+    for (const room of classrooms || []) {
+      const leadId = String(room?.teacher?._id ?? room?.teacher ?? "");
+      const asstId = String(room?.assistantTeacher?._id ?? room?.assistantTeacher ?? "");
+      if (leadId === teacherId || asstId === teacherId) {
+        for (const child of room?.children || []) {
+          childIdSet.add(String(child?._id ?? child));
+        }
+      }
+    }
+    return children.filter((c) => childIdSet.has(String(c?._id ?? c?.id ?? "")));
   };
 
   /** Returns the most common primary language among teacher's children, or '' if none */
-  const getPrimaryLanguageForTeacher = (teacherName) => {
-    const teacherChildren = getChildrenForTeacher(teacherName);
+  const getPrimaryLanguageForTeacher = (teacher) => {
+    const teacherChildren = getChildrenForTeacher(teacher);
     if (teacherChildren.length === 0) return '';
     const langCounts = {};
     teacherChildren.forEach(c => {
@@ -302,10 +325,10 @@ const TeachersPage = () => {
   };
 
   const TeacherCard = ({ teacher, index }) => {
-    const teacherChildren = getChildrenForTeacher(teacher.name);
+    const teacherChildren = getChildrenForTeacher(teacher);
     const hasChildren = teacherChildren.length > 0;
     const isExpanded = expandedTeachers.has(teacher._id);
-    const primaryLanguage = getPrimaryLanguageForTeacher(teacher.name);
+    const primaryLanguage = getPrimaryLanguageForTeacher(teacher);
     const isInvited = invitedTeacherEmails.has((teacher.email || "").toLowerCase().trim());
 
     return (
@@ -735,7 +758,7 @@ const TeachersPage = () => {
                           </thead>
                           <tbody>
                             {filteredTeachers.map((teacher, index) => {
-                              const teacherChildren = getChildrenForTeacher(teacher.name);
+                              const teacherChildren = getChildrenForTeacher(teacher);
                               const hasChildren = teacherChildren.length > 0;
                               const isExpanded = expandedTeachers.has(teacher._id);
                               const isInvited = invitedTeacherEmails.has((teacher.email || "").toLowerCase().trim());
@@ -802,7 +825,7 @@ const TeachersPage = () => {
                                     </td>
                                     <td>
                                       <span className="badge badge-info badge-sm">
-                                        {getPrimaryLanguageForTeacher(teacher.name) || "—"}
+                                        {getPrimaryLanguageForTeacher(teacher) || "—"}
                                       </span>
                                     </td>
                                     <td>

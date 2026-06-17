@@ -10,8 +10,8 @@ const EditChildForm = () => {
   const { id } = useParams();
   const [loading, setLoading] = useState(false);
   const [loadingChild, setLoadingChild] = useState(true);
-  const [teachers, setTeachers] = useState([]);
-  const [loadingTeachers, setLoadingTeachers] = useState(true);
+  const [centers, setCenters] = useState([]);
+  const [loadingCenters, setLoadingCenters] = useState(true);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -19,25 +19,24 @@ const EditChildForm = () => {
     gender: "",
     diagnosis: "",
     primaryLanguage: "",
-    leadTeacher: "",
+    center: "",
   });
 
-  // Fetch teachers from database
   useEffect(() => {
-    const fetchTeachers = async () => {
+    const fetchCenters = async () => {
       try {
-        setLoadingTeachers(true);
-        const response = await axios.get("/api/teachers");
-        setTeachers(response.data.teachers || []);
+        setLoadingCenters(true);
+        const response = await axios.get("/api/centers");
+        setCenters(response.data.centers || []);
       } catch (error) {
-        console.error("Error fetching teachers:", error);
-        setTeachers([]);
+        console.error("Error fetching centers:", error);
+        setCenters([]);
       } finally {
-        setLoadingTeachers(false);
+        setLoadingCenters(false);
       }
     };
 
-    fetchTeachers();
+    fetchCenters();
   }, []);
 
   // Load child data
@@ -61,7 +60,7 @@ const EditChildForm = () => {
             gender: child.gender || "",
             diagnosis: child.diagnosis || "",
             primaryLanguage: child.primaryLanguage || "",
-            leadTeacher: child.leadTeacher || "",
+            center: child.center || "",
           });
         }
       } catch (error) {
@@ -93,7 +92,7 @@ const EditChildForm = () => {
       !formData.gender ||
       !formData.diagnosis ||
       !formData.primaryLanguage ||
-      !formData.leadTeacher
+      !formData.center
     ) {
       toast.error("Please fill in all fields");
       return false;
@@ -127,7 +126,7 @@ const EditChildForm = () => {
         gender: formData.gender,
         diagnosis: formData.diagnosis,
         primaryLanguage: formData.primaryLanguage,
-        leadTeacher: formData.leadTeacher,
+        center: formData.center,
       };
 
       // Make API call to update child
@@ -318,31 +317,34 @@ const EditChildForm = () => {
                 </select>
               </div>
 
-              {/* Lead Teacher */}
+              {/* Center */}
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text font-semibold">Lead Teacher</span>
+                  <span className="label-text font-semibold">Center</span>
+                  <span className="label-text-alt">
+                    Classrooms are set when a parent accepts an invitation
+                  </span>
                 </label>
                 <select
-                  name="leadTeacher"
+                  name="center"
                   className="select select-bordered select-primary w-full"
-                  value={formData.leadTeacher}
+                  value={formData.center}
                   onChange={handleInputChange}
-                  disabled={loadingTeachers}
+                  disabled={loadingCenters}
                 >
                   <option value="">
-                    {loadingTeachers ? "Loading teachers..." : "Select lead teacher"}
+                    {loadingCenters ? "Loading centers..." : "Select center"}
                   </option>
-                  {teachers.map((teacher) => (
-                    <option key={teacher._id} value={teacher.name}>
-                      {teacher.name}
+                  {centers.map((center) => (
+                    <option key={center._id || center.name} value={center.name}>
+                      {center.name}
                     </option>
                   ))}
                 </select>
-                {!loadingTeachers && teachers.length === 0 && (
+                {!loadingCenters && centers.length === 0 && (
                   <label className="label">
                     <span className="label-text-alt text-warning">
-                      No teachers available. Please add teachers first.
+                      No centers available. Please add a center first.
                     </span>
                   </label>
                 )}

@@ -92,32 +92,31 @@ const DataPage = () => {
     fetchData();
   }, []);
 
-  // Separate effect to handle teacher auto-selection after data loads
+  // Auto-select the teacher's center when a teacher lands on this page.
   useEffect(() => {
-    if (!loading && isTeacher() && user?.name && !selectedTeacher) {
-      setSelectedTeacher(user.name);
+    if (loading || !isTeacher() || selectedTeacher) return;
+    const myTeacher = (teachers || []).find(
+      (t) => String(t._id) === String(user?.id) || (user?.name && t.name === user.name)
+    );
+    if (myTeacher?.center) {
+      setSelectedTeacher(myTeacher.center);
     }
-  }, [loading, isTeacher, user, selectedTeacher]);
+  }, [loading, isTeacher, user, selectedTeacher, teachers]);
 
-  // Filter children by selected teacher
+  // Filter children by selected center. Teachers' supervised list is
+  // already scoped server-side; the center filter is primarily for admins.
   useEffect(() => {
     if (selectedTeacher) {
-      const filtered = children.filter(
-        (child) => {
-          // console.log(`Child: ${child.name}, Lead Teacher: ${child.leadTeacher}`);
-          return child.leadTeacher === selectedTeacher;
-        }
-      );
+      const filtered = children.filter((child) => child.center === selectedTeacher);
       setFilteredChildren(filtered);
     } else {
-      // For admins, show all children if no teacher is selected
-      if (isAdmin()) {
+      if (isAdmin() || isTeacher()) {
         setFilteredChildren(children);
       } else {
         setFilteredChildren([]);
       }
     }
-  }, [selectedTeacher, children, isAdmin]);
+  }, [selectedTeacher, children, isAdmin, isTeacher]);
 
   useEffect(() => {
     setSelectedChildIdsForBulk((prev) => {
@@ -307,9 +306,9 @@ const DataPage = () => {
         const ma = getAgeInMonths(a.dateOfBirth);
         const mb = getAgeInMonths(b.dateOfBirth);
         cmp = ma - mb;
-      } else if (sortBy === 'teacher') {
-        const ta = (a.leadTeacher || '').toLowerCase();
-        const tb = (b.leadTeacher || '').toLowerCase();
+      } else if (sortBy === 'center') {
+        const ta = (a.center || '').toLowerCase();
+        const tb = (b.center || '').toLowerCase();
         cmp = ta.localeCompare(tb);
       } else if (sortBy === 'language') {
         const la = (a.primaryLanguage || '').toLowerCase();
@@ -424,51 +423,65 @@ const DataPage = () => {
           </div>
         </div>
 
-        {/* Teacher Selection - Hidden for teachers, info card shown instead */}
-        {isTeacher() ? (
-          <div className="card bg-base-100 shadow-xl mb-6">
-            <div className="card-body">
-              <div className="alert alert-info">
-                <Users className="w-5 h-5" />
-                <span>Viewing your students: <strong>{selectedTeacher}</strong></span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="card bg-base-100 shadow-xl mb-6">
-            <div className="card-body">
-              <div className="form-control w-full max-w-md">
-                <label className="label">
-                  <span className="label-text font-semibold flex items-center gap-2">
+        {(() => {
+          // Distinct centers derived from the loaded teachers list. Cheap
+          // enough to recompute on every render; switch to a memo if the
+          // teachers list ever grows materially.
+          const centerOptions = [...new Set(
+            (teachers || [])
+              .map((t) => (t?.center || "").trim())
+              .filter(Boolean)
+          )].sort((a, b) => a.localeCompare(b));
+
+          if (isTeacher()) {
+            return (
+              <div className="card bg-base-100 shadow-xl mb-6">
+                <div className="card-body">
+                  <div className="alert alert-info">
                     <Users className="w-5 h-5" />
-                    Select Teacher ({teachers.length} available)
-                  </span>
-                </label>
-                <select
-                  className="select select-bordered select-primary w-full"
-                  value={selectedTeacher}
-                  onChange={handleTeacherChange}
-                  disabled={loading}
-                >
-                  <option value="">{loading ? "Loading teachers..." : "All teachers"}</option>
-                  {teachers.map((teacher) => (
-                    <option
-                      key={teacher._id}
-                      value={teacher.name}
-                    >
-                      {teacher.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {!loading && teachers.length === 0 && (
-                <div className="alert alert-warning mt-4">
-                  <span>No teachers found. Add teachers using the Add Teacher form.</span>
+                    <span>
+                      Viewing children at your center
+                      {selectedTeacher ? <>: <strong>{selectedTeacher}</strong></> : null}
+                    </span>
+                  </div>
                 </div>
-              )}
+              </div>
+            );
+          }
+
+          return (
+            <div className="card bg-base-100 shadow-xl mb-6">
+              <div className="card-body">
+                <div className="form-control w-full max-w-md">
+                  <label className="label">
+                    <span className="label-text font-semibold flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      Filter by Center ({centerOptions.length} available)
+                    </span>
+                  </label>
+                  <select
+                    className="select select-bordered select-primary w-full"
+                    value={selectedTeacher}
+                    onChange={handleTeacherChange}
+                    disabled={loading}
+                  >
+                    <option value="">{loading ? "Loading centers..." : "All centers"}</option>
+                    {centerOptions.map((centerName) => (
+                      <option key={centerName} value={centerName}>
+                        {centerName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {!loading && centerOptions.length === 0 && (
+                  <div className="alert alert-warning mt-4">
+                    <span>No centers found yet. Add teachers (each carries a center) to populate this list.</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Children Table - Show for selected teacher or all children for admins */}
         {(selectedTeacher || (isAdmin() && children.length > 0)) && (
@@ -476,7 +489,7 @@ const DataPage = () => {
             <div className="card-body">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                 <h2 className="card-title">
-                  {selectedTeacher ? `Children under ${selectedTeacher}` : "All Children"}
+                  {selectedTeacher ? `Children at ${selectedTeacher}` : "All Children"}
                 </h2>
                 {bulkEligibleChildren.length > 0 && (
                   <button
@@ -500,7 +513,7 @@ const DataPage = () => {
               <div className="block md:hidden space-y-3">
                 {filteredChildren.length === 0 ? (
                   <p className="text-center text-base-content/60 py-8">
-                    No children found for this teacher.
+                    No children found.
                   </p>
                 ) : (
                   sortedChildren.map((child, index) => (
@@ -542,7 +555,7 @@ const DataPage = () => {
                             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-sm text-base-content/70">
                               <span>Age: {calculateAge(child.dateOfBirth)}</span>
                               <span>Lang: {child.primaryLanguage}</span>
-                              <span>Teacher: {child.leadTeacher || "—"}</span>
+                              <span>Center: {child.center || "—"}</span>
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-1 justify-end">
@@ -635,11 +648,11 @@ const DataPage = () => {
                       <th>
                         <button
                           type="button"
-                          onClick={() => handleSort('teacher')}
+                          onClick={() => handleSort('center')}
                           className="flex items-center gap-1 hover:underline"
                         >
-                          Teacher
-                          {sortBy === 'teacher' ? (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
+                          Center
+                          {sortBy === 'center' ? (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
                         </button>
                       </th>
                       <th>Actions</th>
@@ -652,7 +665,7 @@ const DataPage = () => {
                           colSpan="7"
                           className="text-center text-base-content/60"
                         >
-                          No children found for this teacher.
+                          No children found.
                         </td>
                       </tr>
                     ) : (
@@ -685,7 +698,7 @@ const DataPage = () => {
                           </td>
                           <td className="align-middle">{calculateAge(child.dateOfBirth)}</td>
                           <td className="align-middle">{child.primaryLanguage}</td>
-                          <td className="align-middle">{child.leadTeacher || "—"}</td>
+                          <td className="align-middle">{child.center || "—"}</td>
                           <td className="align-middle">
                             <div className="flex gap-2">
                             <button
@@ -754,10 +767,10 @@ const DataPage = () => {
                 <div className="bg-primary/10 p-8 rounded-full mb-6">
                   <Users className="w-16 h-16 text-primary" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2">Select a Teacher</h2>
+                <h2 className="text-2xl font-bold mb-2">Select a Center</h2>
                 <p className="text-base-content/60 text-center max-w-md">
-                  Choose a teacher from the dropdown above to view their
-                  students' data and track progress.
+                  Choose a center from the dropdown above to view children
+                  enrolled there, or leave it blank to see everyone.
                 </p>
               </div>
             </div>
@@ -789,8 +802,8 @@ const DataPage = () => {
                       {inviteModalChildren.map((c) => (
                         <li key={childDocId(c)}>
                           <strong>{c.name}</strong>
-                          {c.leadTeacher ? (
-                            <span className="text-base-content/60"> — {c.leadTeacher}</span>
+                          {c.center ? (
+                            <span className="text-base-content/60"> — {c.center}</span>
                           ) : null}
                         </li>
                       ))}

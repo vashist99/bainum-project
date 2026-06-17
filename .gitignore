@@ -115,3 +115,22 @@ eval-data/
 .cache/
 .temp/
 prompts.txt
+
+# AI/agent scratch directories (Cursor, Claude, Continue, etc.)
+.agent/
+.agents/
+.claude/
+.codebuddy/
+.codex/
+.continue/
+.cursor/
+.gemini/
+.github/prompts/
+.github/skills/
+.kiro/
+.opencode/
+.qoder/
+.roo/
+.trae/
+.windsurf/
+skills-lock.json
