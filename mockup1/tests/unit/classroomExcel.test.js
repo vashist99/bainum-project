@@ -1,7 +1,10 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildClassroomWorkbook } from "../../src/utils/classroomExcel.js";
+import {
+    buildClassroomWorkbook,
+    buildTranscriptsWorkbook,
+} from "../../src/utils/classroomExcel.js";
 
 // Two fixture recordings: one with a full per-category breakdown, one
 // near-empty so we exercise the "missing field" fallbacks (these are the
@@ -165,5 +168,181 @@ describe("buildClassroomWorkbook", () => {
         const view = new Uint8Array(buf);
         assert.equal(view[0], 0x50); // 'P'
         assert.equal(view[1], 0x4b); // 'K'
+    });
+});
+
+// ─── single-sheet layout (Teacher-Profile export) ─────────────────────
+
+const SINGLE_SHEET_FIXTURE = [
+    {
+        date: "2026-04-12T14:32:00.000Z",
+        uploadedBy: "Alice Teacher",
+        activity: "Circle time",
+        activityContext: "school",
+        durationSeconds: 305,
+        transcript: "First line.\nSecond line with newline.",
+        wordCount: 220,
+        wordsPerMinute: 43.3,
+        categoryWPM: {
+            science: 10,
+            social: 5.5,
+            literature: 3,
+            language: 24.8,
+        },
+        categoryWordCount: {
+            science: 50,
+            social: 28,
+            literature: 15,
+            language: 127,
+        },
+    },
+    {
+        date: "2026-04-05T10:00:00.000Z",
+        uploadedBy: "Alice Teacher",
+        activity: null,
+        activityContext: null,
+        durationSeconds: null,
+        transcript: "",
+        wordCount: null,
+        wordsPerMinute: null,
+    },
+];
+
+describe("buildTranscriptsWorkbook(single-sheet layout)", () => {
+    test("returns a workbook with exactly one sheet named 'Transcripts'", () => {
+        const wb = buildTranscriptsWorkbook("Alice", SINGLE_SHEET_FIXTURE, {
+            layout: "single-sheet",
+        });
+        assert.equal(wb.worksheets.length, 1);
+        assert.equal(wb.worksheets[0].name, "Transcripts");
+    });
+
+    test("column order matches the spec (Date → … → Transcript)", () => {
+        const wb = buildTranscriptsWorkbook("Alice", SINGLE_SHEET_FIXTURE, {
+            layout: "single-sheet",
+        });
+        const headers = wb
+            .getWorksheet("Transcripts")
+            .getRow(1)
+            .values.slice(1);
+        assert.deepEqual(headers, [
+            "Date",
+            "Uploaded By",
+            "Activity",
+            "Activity Context",
+            "Audio Length",
+            "Total Words",
+            "Total WPM",
+            "Science Words",
+            "Science WPM",
+            "Social-Emotional Words",
+            "Social-Emotional WPM",
+            "Literacy Words",
+            "Literacy WPM",
+            "Language Words",
+            "Language WPM",
+            "Transcript",
+        ]);
+    });
+
+    test("header row is bolded and the view is frozen at the header", () => {
+        const wb = buildTranscriptsWorkbook("Alice", SINGLE_SHEET_FIXTURE, {
+            layout: "single-sheet",
+        });
+        const sheet = wb.getWorksheet("Transcripts");
+        assert.equal(sheet.getRow(1).font?.bold, true);
+        assert.deepEqual(sheet.views, [{ state: "frozen", ySplit: 1 }]);
+    });
+
+    test("Date cells are real Date objects formatted mm/dd/yyyy", () => {
+        const wb = buildTranscriptsWorkbook("Alice", SINGLE_SHEET_FIXTURE, {
+            layout: "single-sheet",
+        });
+        const sheet = wb.getWorksheet("Transcripts");
+        const dateCell = sheet.getCell("A2");
+        assert.ok(
+            dateCell.value instanceof Date,
+            `Expected Date instance, got ${typeof dateCell.value}`
+        );
+        assert.equal(
+            dateCell.value.toISOString(),
+            "2026-04-12T14:32:00.000Z"
+        );
+        assert.equal(sheet.getColumn("date").numFmt, "mm/dd/yyyy");
+    });
+
+    test("Activity Context column is populated from the recording's activityContext", () => {
+        const wb = buildTranscriptsWorkbook("Alice", SINGLE_SHEET_FIXTURE, {
+            layout: "single-sheet",
+        });
+        const sheet = wb.getWorksheet("Transcripts");
+        assert.equal(sheet.getCell("D2").value, "school");
+        assert.equal(sheet.getCell("D3").value, ""); // missing → blank
+    });
+
+    test("Transcript column carries the full text including newlines", () => {
+        const wb = buildTranscriptsWorkbook("Alice", SINGLE_SHEET_FIXTURE, {
+            layout: "single-sheet",
+        });
+        const sheet = wb.getWorksheet("Transcripts");
+        // Last column = column 16 (P).
+        assert.equal(
+            sheet.getCell("P2").value,
+            "First line.\nSecond line with newline."
+        );
+        assert.equal(sheet.getCell("P3").value, ""); // missing → blank string
+    });
+
+    test("emits one data row per recording", () => {
+        const wb = buildTranscriptsWorkbook("Alice", SINGLE_SHEET_FIXTURE, {
+            layout: "single-sheet",
+        });
+        assert.equal(
+            wb.getWorksheet("Transcripts").rowCount,
+            1 + SINGLE_SHEET_FIXTURE.length
+        );
+    });
+
+    test("default layout (no options) preserves the two-sheet classroom export", () => {
+        // buildClassroomWorkbook is just a thin wrapper; this guards
+        // against regressions in the default branch.
+        const wb = buildTranscriptsWorkbook("Toddler Room", FIXTURE_RECORDINGS);
+        const names = wb.worksheets.map((ws) => ws.name);
+        assert.deepEqual(names, ["Recordings", "Transcripts"]);
+    });
+
+    test("empty recordings array produces a single header-only sheet", () => {
+        const wb = buildTranscriptsWorkbook("Alice", [], {
+            layout: "single-sheet",
+        });
+        assert.equal(wb.worksheets.length, 1);
+        assert.equal(wb.getWorksheet("Transcripts").rowCount, 1);
+    });
+
+    test("single-sheet workbook serializes to a valid XLSX buffer", async () => {
+        const wb = buildTranscriptsWorkbook("Alice", SINGLE_SHEET_FIXTURE, {
+            layout: "single-sheet",
+        });
+        const buf = await wb.xlsx.writeBuffer();
+        const view = new Uint8Array(buf);
+        assert.equal(view[0], 0x50); // 'P'
+        assert.equal(view[1], 0x4b); // 'K'
+    });
+
+    test("buildClassroomWorkbook is a thin alias of buildTranscriptsWorkbook(... two-sheet)", () => {
+        const a = buildClassroomWorkbook("Room", FIXTURE_RECORDINGS);
+        const b = buildTranscriptsWorkbook("Room", FIXTURE_RECORDINGS, {
+            layout: "two-sheet",
+        });
+        // Same sheet names + same column counts is enough to assert
+        // structural equivalence without serializing both workbooks.
+        assert.deepEqual(
+            a.worksheets.map((ws) => ws.name),
+            b.worksheets.map((ws) => ws.name)
+        );
+        assert.equal(
+            a.getWorksheet("Recordings").columns.length,
+            b.getWorksheet("Recordings").columns.length
+        );
     });
 });

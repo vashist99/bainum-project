@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { Navigate } from "react-router";
 import AppLayout from "../components/AppLayout";
-import { User, Mail, Building2, Mic, FileText, Calendar, Download, Trash2 } from "lucide-react";
+import { User, Mail, Building2, Mic, FileText, Download } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 import { LanguageDevelopmentCharts } from "../components/LanguageDevelopmentCharts";
-import { highlightRAGSegments, getSegmentsForHighlighting } from "../utils/ragHighlightSegments.js";
-import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
 import ClassroomUploadModal from "../components/ClassroomUploadModal";
+import TranscriptRecordCard from "../components/TranscriptRecordCard.jsx";
+import { buildTranscriptsWorkbook } from "../utils/classroomExcel";
 
 const TeacherProfilePage = () => {
   const { user } = useAuth();
@@ -18,6 +18,7 @@ const TeacherProfilePage = () => {
   const [viewMode, setViewMode] = useState("dotmatrix");
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [cohortThresholdsByCategory, setCohortThresholdsByCategory] = useState(null);
+  const [downloadingXlsx, setDownloadingXlsx] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -69,6 +70,44 @@ const TeacherProfilePage = () => {
   };
 
   const transcriptsWithContent = assessments.filter((a) => a.transcript?.trim());
+
+  const handleDownloadXlsx = async () => {
+    if (!transcriptsWithContent.length) return;
+    setDownloadingXlsx(true);
+    try {
+      // Newest first — matches the on-screen ordering.
+      const sorted = [...transcriptsWithContent].sort(
+        (a, b) => new Date(b.date) - new Date(a.date)
+      );
+      const teacherName = teacher?.name || user?.name || "";
+      const wb = buildTranscriptsWorkbook(teacherName || "Classroom Talk", sorted, {
+        layout: "single-sheet",
+      });
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const today = new Date().toISOString().split("T")[0];
+      // Match the classroom export's sanitizer; fall back to the
+      // historical filename when the teacher's name hasn't loaded yet.
+      const safeName = teacherName
+        ? teacherName.replace(/[^a-z0-9-_]+/gi, "_")
+        : "my_classroom";
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${safeName}_transcripts_${today}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Excel export failed:", error);
+      toast.error("Failed to build Excel file");
+    } finally {
+      setDownloadingXlsx(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -154,35 +193,17 @@ const TeacherProfilePage = () => {
               </h2>
               {transcriptsWithContent.length > 0 && (
                 <button
-                  onClick={() => {
-                    const text = transcriptsWithContent
-                      .sort((a, b) => new Date(b.date) - new Date(a.date))
-                      .map((a) => {
-                        const dateStr = new Date(a.date).toLocaleDateString("en-US", {
-                          month: "long",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        });
-                        const activityLine = a.activity ? `Activity: ${a.activity}\n` : "";
-                        return `=== Transcript from ${dateStr} ===\n${activityLine}${a.uploadedBy ? `Uploaded by: ${a.uploadedBy}\n` : ""}${a.transcript}\n\n`;
-                      })
-                      .join("\n");
-                    const blob = new Blob([text], { type: "text/plain" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `my_classroom_transcripts_${new Date().toISOString().split("T")[0]}.txt`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    toast.success("All transcripts downloaded");
-                  }}
+                  type="button"
+                  onClick={handleDownloadXlsx}
+                  disabled={downloadingXlsx}
                   className="btn btn-primary btn-sm gap-2"
+                  title="Download all transcripts and per-category word counts as an Excel file"
                 >
-                  <Download className="w-4 h-4" />
+                  {downloadingXlsx ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
                   Download All
                 </button>
               )}
@@ -195,104 +216,25 @@ const TeacherProfilePage = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {transcriptsWithContent
+                {[...transcriptsWithContent]
                   .sort((a, b) => new Date(b.date) - new Date(a.date))
-                  .map((assessment) => {
-                    const segments = getSegmentsForHighlighting(assessment.transcript, assessment.ragSegments);
-                    return (
-                      <div key={assessment._id} className="card bg-base-200 border border-base-300">
-                        <div className="card-body p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold flex items-center gap-2 flex-wrap">
-                                <Calendar className="w-4 h-4 shrink-0" />
-                                <span>
-                                  {new Date(assessment.date).toLocaleDateString("en-US", {
-                                    month: "long",
-                                    day: "numeric",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
-                                {assessment.activity && (
-                                  <span
-                                    className="badge badge-outline badge-primary badge-sm font-normal"
-                                    title={
-                                      assessment.activityContext === "home"
-                                        ? "Activity recorded at home"
-                                        : "Activity recorded at school"
-                                    }
-                                  >
-                                    {assessment.activity}
-                                  </span>
-                                )}
-                              </h3>
-                            </div>
-                            <button
-                              onClick={() => handleDeleteTeacherAssessment(assessment._id)}
-                              className="btn btn-ghost btn-sm btn-circle text-error"
-                              title="Delete transcript"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <div className="bg-base-100 p-4 rounded-lg border border-base-300 max-h-64 overflow-y-auto mt-2">
-                            {segments.length > 0 ? (
-                              <>
-                                <RAGColorLegend />
-                                <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                                  {highlightRAGSegments(assessment.transcript, segments)}
-                                </p>
-                              </>
-                            ) : (
-                              <p className="text-sm whitespace-pre-wrap leading-relaxed">{assessment.transcript}</p>
-                            )}
-                          </div>
-                          <div className="mt-3 space-y-2">
-                            <div className="flex flex-wrap gap-1 items-center">
-                              {assessment.durationSeconds != null && (
-                                <span className="text-xs text-base-content/60">
-                                  {Math.floor(assessment.durationSeconds / 60)} min {Math.round(assessment.durationSeconds % 60)} sec
-                                </span>
-                              )}
-                              {assessment.wordsPerMinute != null ? (
-                                <span className="badge badge-sm badge-primary">
-                                  {Math.round(assessment.wordsPerMinute * 10) / 10} WPM
-                                </span>
-                              ) : (
-                                <span className="badge badge-sm badge-ghost">WPM: N/A</span>
-                              )}
-                              {assessment.categoryWPM && (
-                                <span className="text-[10px] text-base-content/60 ml-1" title={`Science: ${assessment.categoryWPM.science ?? '—'} | Social: ${assessment.categoryWPM.social ?? '—'} | Literature: ${assessment.categoryWPM.literature ?? '—'} | Language: ${assessment.categoryWPM.language ?? '—'}`}>
-                                  Sci {assessment.categoryWPM.science ?? '—'} · Soc {assessment.categoryWPM.social ?? '—'} · Lit {assessment.categoryWPM.literature ?? '—'} · Lang {assessment.categoryWPM.language ?? '—'}
-                                </span>
-                              )}
-                            </div>
-                            {assessment.categoryWordCount && (
-                              <div className="flex flex-wrap gap-2 text-xs">
-                                {[
-                                  { key: 'science', label: 'Science', color: 'badge-info' },
-                                  { key: 'social', label: 'Social', color: 'badge-success' },
-                                  { key: 'literature', label: 'Literature', color: 'badge-secondary' },
-                                  { key: 'language', label: 'Language', color: 'badge-warning' }
-                                ].map(({ key, label, color }) => {
-                                  const words = assessment.categoryWordCount[key] ?? 0;
-                                  const wpm = assessment.categoryWPM?.[key];
-                                  return (
-                                    <span key={key} className={`badge badge-sm ${color}`}>
-                                      {label}: {words} word{words !== 1 ? 's' : ''}
-                                      {wpm != null ? ` (${Math.round(wpm * 10) / 10} WPM)` : ''}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  .map((assessment) => (
+                    <TranscriptRecordCard
+                      key={assessment._id}
+                      id={String(assessment._id)}
+                      date={assessment.date}
+                      activity={assessment.activity}
+                      activityContext={assessment.activityContext}
+                      durationSeconds={assessment.durationSeconds}
+                      wordCount={assessment.wordCount}
+                      wordsPerMinute={assessment.wordsPerMinute}
+                      categoryWPM={assessment.categoryWPM}
+                      categoryWordCount={assessment.categoryWordCount}
+                      transcript={assessment.transcript}
+                      ragSegments={assessment.ragSegments}
+                      onDelete={() => handleDeleteTeacherAssessment(assessment._id)}
+                    />
+                  ))}
               </div>
             )}
           </div>

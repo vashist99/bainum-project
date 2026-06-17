@@ -22,6 +22,7 @@ import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 import { buildClassroomWorkbook } from "../utils/classroomExcel";
+import TranscriptRecordCard from "../components/TranscriptRecordCard.jsx";
 
 const CATEGORIES = ["science", "social", "literature", "language"];
 
@@ -206,6 +207,41 @@ const ClassroomHomePage = () => {
       );
     } finally {
       setPendingChildOpId(null);
+    }
+  };
+
+  /**
+   * Decide whether the signed-in viewer can delete a specific
+   * classroom recording. See design.md §D2:
+   *   - Admins can delete anything in the room.
+   *   - Teachers can delete only their own `source === "teacher"`
+   *     recordings (the recording's `teacherId` must match).
+   *   - Child-source recordings allow delete only to admins (the
+   *     payload lacks an `uploaderId` we'd trust for owner-based
+   *     auth on child rows).
+   */
+  const canDeleteRecording = (rec) => {
+    if (!user) return false;
+    if (isAdmin()) return true;
+    if (rec?.source === "teacher") {
+      return String(rec?.teacherId ?? "") === String(user.id ?? "");
+    }
+    return false;
+  };
+
+  const deleteRecording = async (rec) => {
+    const endpoint =
+      rec?.source === "teacher"
+        ? `/api/assessments/teacher/${rec._id}`
+        : `/api/assessments/${rec._id}`;
+    try {
+      await axios.delete(endpoint);
+      toast.success("Transcript deleted");
+      refreshMembership();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Failed to delete transcript"
+      );
     }
   };
 
@@ -590,58 +626,37 @@ const ClassroomHomePage = () => {
                     days will appear here.
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="table table-zebra table-sm">
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Activity</th>
-                          <th>Uploaded By</th>
-                          <th className="text-right">Words</th>
-                          <th className="text-right">WPM</th>
-                          <th>Transcript</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {transcripts.map((rec) => (
-                          <tr key={rec.id}>
-                            <td className="whitespace-nowrap">
-                              {rec.date
-                                ? new Date(rec.date).toLocaleDateString()
-                                : "—"}
-                            </td>
-                            <td className="whitespace-nowrap">
-                              {rec.activity || "—"}
-                            </td>
-                            <td className="whitespace-nowrap">
-                              {rec.uploadedBy || "—"}
-                            </td>
-                            <td className="text-right">
-                              {rec.wordCount ?? "—"}
-                            </td>
-                            <td className="text-right">
-                              {rec.wordsPerMinute != null
-                                ? Math.round(rec.wordsPerMinute)
-                                : "—"}
-                            </td>
-                            <td className="max-w-md">
-                              {rec.transcript ? (
-                                <details>
-                                  <summary className="cursor-pointer text-primary text-sm">
-                                    View transcript
-                                  </summary>
-                                  <div className="mt-2 text-sm whitespace-pre-wrap text-base-content/80 max-h-48 overflow-y-auto">
-                                    {rec.transcript}
-                                  </div>
-                                </details>
-                              ) : (
-                                <span className="text-base-content/40">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="space-y-4">
+                    {transcripts.map((rec) => {
+                      // Surface "who recorded this" on the classroom variant
+                      // since recordings here can span multiple uploaders;
+                      // the Teacher Profile uses attribution={null}.
+                      const attribution =
+                        rec.source === "teacher"
+                          ? `Recorded by: ${rec.teacherName || "—"}`
+                          : `Recorded for: ${rec.childName || "—"}`;
+                      const onDelete = canDeleteRecording(rec)
+                        ? () => deleteRecording(rec)
+                        : undefined;
+                      return (
+                        <TranscriptRecordCard
+                          key={`${rec.source || "rec"}-${rec._id}`}
+                          id={String(rec._id)}
+                          date={rec.date}
+                          activity={rec.activity}
+                          activityContext={rec.activityContext}
+                          attribution={attribution}
+                          durationSeconds={rec.durationSeconds}
+                          wordCount={rec.wordCount}
+                          wordsPerMinute={rec.wordsPerMinute}
+                          categoryWPM={rec.categoryWPM}
+                          categoryWordCount={rec.categoryWordCount}
+                          transcript={rec.transcript || ""}
+                          ragSegments={rec.ragSegments}
+                          onDelete={onDelete}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>

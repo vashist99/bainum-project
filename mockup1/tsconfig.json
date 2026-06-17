@@ -1,0 +1,14 @@
+{
+    "_comment": "Used by `tsx` (the node:test loader) so that .jsx files compile with the automatic JSX runtime, matching Vite's behavior. Production builds still go through Vite.",
+    "compilerOptions": {
+        "jsx": "react-jsx",
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "target": "es2022",
+        "allowImportingTsExtensions": true,
+        "allowJs": true,
+        "noEmit": true,
+        "skipLibCheck": true
+    },
+    "include": ["src/**/*", "tests/**/*"]
+}
