@@ -16,6 +16,9 @@ function queryReturning(value) {
         select() {
             return chain;
         },
+        populate() {
+            return chain;
+        },
         lean() {
             return promise;
         },
@@ -75,9 +78,15 @@ describe("getSupervisedChildrenForTeacher", () => {
             { _id: CHILD_2, name: "Bob" },
             { _id: CHILD_3, name: "Carol" },
         ];
-        childFindMock = t.mock.method(Child, "find", () =>
-            Promise.resolve(found)
-        );
+        childFindMock = t.mock.method(Child, "find", (filter) => {
+            if (filter?.classrooms?.$in) {
+                return queryReturning([]);
+            }
+            if (filter?._id?.$in) {
+                return queryReturning(found);
+            }
+            assert.fail(`Unexpected Child.find filter: ${JSON.stringify(filter)}`);
+        });
 
         const result = await getSupervisedChildrenForTeacher({ _id: TEACHER_ID });
         const names = result.map((c) => c.name).sort();
@@ -97,8 +106,8 @@ describe("getSupervisedChildrenForTeacher", () => {
         assert.equal(String(grantFilter.teacherId), String(TEACHER_ID));
         assert.equal(grantFilter.status, "active");
 
-        // Child.find was called once with the deduped id set (3 unique).
-        const childFilter = childFindMock.mock.calls[0].arguments[0];
+        // Child.find by ids (second call) was invoked with the deduped id set (3 unique).
+        const childFilter = childFindMock.mock.calls[1].arguments[0];
         assert.equal(childFilter._id.$in.length, 3);
     });
 
@@ -129,9 +138,15 @@ describe("getSupervisedChildrenForTeacher", () => {
         accessGrantFindMock = t.mock.method(AccessGrant, "find", () =>
             queryReturning([{ childId: CHILD_1 }])
         );
-        childFindMock = t.mock.method(Child, "find", () =>
-            Promise.resolve([{ _id: CHILD_1, name: "Solo" }])
-        );
+        childFindMock = t.mock.method(Child, "find", (filter) => {
+            if (filter?.classrooms?.$in) {
+                return queryReturning([]);
+            }
+            if (filter?._id?.$in) {
+                return queryReturning([{ _id: CHILD_1, name: "Solo" }]);
+            }
+            assert.fail(`Unexpected Child.find filter: ${JSON.stringify(filter)}`);
+        });
 
         const result = await getSupervisedChildrenForTeacher({ _id: TEACHER_ID });
         assert.equal(result.length, 1);
@@ -145,12 +160,18 @@ describe("getSupervisedChildrenForTeacher", () => {
         accessGrantFindMock = t.mock.method(AccessGrant, "find", () =>
             queryReturning([{}, { childId: null }, { childId: CHILD_2 }])
         );
-        childFindMock = t.mock.method(Child, "find", () =>
-            Promise.resolve([
-                { _id: CHILD_1, name: "Alice" },
-                { _id: CHILD_2, name: "Bob" },
-            ])
-        );
+        childFindMock = t.mock.method(Child, "find", (filter) => {
+            if (filter?.classrooms?.$in) {
+                return queryReturning([]);
+            }
+            if (filter?._id?.$in) {
+                return queryReturning([
+                    { _id: CHILD_1, name: "Alice" },
+                    { _id: CHILD_2, name: "Bob" },
+                ]);
+            }
+            assert.fail(`Unexpected Child.find filter: ${JSON.stringify(filter)}`);
+        });
 
         const result = await getSupervisedChildrenForTeacher({ _id: TEACHER_ID });
         assert.equal(result.length, 2);
@@ -167,16 +188,21 @@ describe("getSupervisedChildrenForTeacher", () => {
         accessGrantFindMock = t.mock.method(AccessGrant, "find", () =>
             queryReturning([])
         );
-        childFindMock = t.mock.method(Child, "find", () =>
-            Promise.resolve([{ _id: CHILD_1 }])
-        );
+        childFindMock = t.mock.method(Child, "find", (filter) => {
+            if (filter?.classrooms?.$in) {
+                return queryReturning([]);
+            }
+            if (filter?._id?.$in) {
+                return queryReturning([{ _id: CHILD_1 }]);
+            }
+            assert.fail(`Unexpected Child.find filter: ${JSON.stringify(filter)}`);
+        });
 
         await getSupervisedChildrenForTeacher({ _id: TEACHER_ID });
 
-        // Exactly one Child.find call, and the filter is keyed on _id $in
-        // (no leadTeacher key anywhere).
-        assert.equal(childFindMock.mock.calls.length, 1);
-        const filter = childFindMock.mock.calls[0].arguments[0];
+        // Final Child.find by ids (populate) plus one classrooms back-ref lookup.
+        assert.equal(childFindMock.mock.calls.length, 2);
+        const filter = childFindMock.mock.calls[1].arguments[0];
         assert.ok(filter._id?.$in, "Expected an _id $in filter");
         assert.equal(filter.leadTeacher, undefined);
     });

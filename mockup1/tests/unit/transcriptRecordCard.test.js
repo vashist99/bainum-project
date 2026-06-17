@@ -202,6 +202,28 @@ describe("TranscriptRecordCard — per-category word-count badges", () => {
     });
 });
 
+describe("TranscriptRecordCard — mobile-friendly layout", () => {
+    test("uses responsive header stack and break-words on transcript body", () => {
+        const html = render({
+            ...BASE_PROPS,
+            activity: "Very long circle time activity label",
+            onDelete: () => {},
+            categoryWordCount: { science: 26, social: 17, literature: 9, language: 68 },
+        });
+        assert.match(html, /flex-col/);
+        assert.match(html, /sm:flex-row/);
+        assert.match(html, /break-words/);
+        assert.match(html, /min-h-11/);
+        assert.match(html, /min-w-11/);
+        assert.doesNotMatch(html, /w-\[320px\]/);
+    });
+
+    test("card root does not force a fixed viewport width", () => {
+        const html = render(BASE_PROPS);
+        assert.doesNotMatch(html, /min-w-\[|w-screen/);
+    });
+});
+
 describe("TranscriptRecordCard — RAG highlighting", () => {
     test("renders the RAG legend and highlighted spans when ragSegments is non-empty", () => {
         const ragSegments = [

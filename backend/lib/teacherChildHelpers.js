@@ -34,9 +34,20 @@ export async function getSupervisedChildrenForTeacher(teacher) {
     })
         .select("children")
         .lean();
+
     const classroomChildIds = new Set(
         rooms.flatMap((r) => (r.children || []).map(String))
     );
+
+    const roomIds = rooms.map((r) => r._id).filter(Boolean);
+    if (roomIds.length > 0) {
+        const fromChildRefs = await Child.find({ classrooms: { $in: roomIds } })
+            .select("_id")
+            .lean();
+        for (const child of fromChildRefs) {
+            if (child?._id) classroomChildIds.add(String(child._id));
+        }
+    }
 
     const grants = await AccessGrant.find({
         teacherId,
@@ -50,7 +61,10 @@ export async function getSupervisedChildrenForTeacher(teacher) {
 
     if (classroomChildIds.size === 0) return [];
 
-    const children = await Child.find({ _id: { $in: [...classroomChildIds] } });
+    const children = await Child.find({ _id: { $in: [...classroomChildIds] } }).populate(
+        "classrooms",
+        "name"
+    );
     for (const c of children) {
         if (c?._id) childMap.set(String(c._id), c);
     }

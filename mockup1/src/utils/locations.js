@@ -1,7 +1,7 @@
 /**
  * Locations surfaced in the recording-location picker.
  *
- *  - `home`   → shown to parents (where the family recording happened)
+ *  - `home`   → shown to parents (routine/setting where the family recording happened)
  *  - `school` → shown to teachers and admins (where the classroom recording happened)
  *
  * Anything outside these curated lists is treated as a custom location and validated
@@ -9,18 +9,14 @@
  */
 export const PREDEFINED_LOCATIONS = {
   home: [
-    "Home",
-    "Park",
-    "Friend / relative's home",
-    "Museum",
-    "Athletic event / stadium",
-    "Restaurant",
-    "Library",
-    "Grocery / big box store",
-    "Medical or therapy office",
-    "Travel (e.g., car, bus)",
-    "Faith-based organization",
-    "Community Center (e.g., pool)",
+    "Mealtime or snacks",
+    "Personal Care (e.g., dressing, bathing, brushing teeth)",
+    "Play/free play (e.g., blocks, puzzles, cars & trucks)",
+    "Screen time (e.g., show, iPad / tablet / video games)",
+    "Reading or looking at books",
+    "Outdoor play (e.g., playing soccer, swinging)",
+    "Clean up (e.g., picking up toys)",
+    "Structured Activities (non-free play activities such as circle time, art, small group)",
   ],
   school: [
     "Classroom",
@@ -35,7 +31,7 @@ export const CUSTOM_LOCATION_VALUE = "__custom_location__";
 
 /** Most common location per context — preselected so the happy path needs no clicks. */
 export const DEFAULT_LOCATION = {
-  home: "Home",
+  home: "Play/free play (e.g., blocks, puzzles, cars & trucks)",
   school: "Classroom",
 };
 

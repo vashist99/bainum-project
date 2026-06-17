@@ -22,3 +22,19 @@ export const REMOVE_CHILD_MODAL_BULLETS = [
   "The parent and child accounts themselves are not deleted.",
   "Historical assessments retain their classroom attribution for reporting.",
 ];
+
+/** Normalize a classroom ref from API (`ObjectId`, `{ _id, name }`, or string id). */
+export function classroomRefId(room) {
+  if (room == null) return "";
+  if (typeof room === "object") return String(room._id ?? room.id ?? "");
+  return String(room);
+}
+
+/** Display label for a classroom ref; prefers populated `name` from the API. */
+export function classroomRefName(room) {
+  if (room && typeof room === "object") {
+    const name = typeof room.name === "string" ? room.name.trim() : "";
+    if (name) return name;
+  }
+  return "Unknown classroom";
+}

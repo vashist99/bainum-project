@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import AppLayout from "../components/AppLayout";
+import SearchField from "../components/SearchField";
 import { CardLoading, EmptySchools } from "../components/LoadingStates";
 import { schoolsFromListResponse } from "../utils/schools.js";
 import { Plus, Edit, Trash2, ChevronDown, ChevronRight, Building2, Users, Mail, MapPin, Phone, Search, Filter } from "lucide-react";
@@ -219,7 +220,7 @@ const SchoolsPage = () => {
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
               <div>
@@ -231,33 +232,24 @@ const SchoolsPage = () => {
                 </p>
               </div>
               
-              <div className="flex items-center gap-3">
-                {/* Search */}
-                <div className="form-control">
-                  <div className="input-group">
-                    <span className="bg-base-300">
-                      <Search className="w-4 h-4" />
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Search schools..."
-                      className="input input-bordered input-sm w-64"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center w-full lg:w-auto lg:justify-end">
+                <SearchField
+                  placeholder="Search schools..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="sm:w-64"
+                />
                 
                 {/* View Toggle */}
-                <div className="btn-group">
+                <div className="btn-group w-full sm:w-auto">
                   <button 
-                    className={`btn btn-sm ${viewMode === 'cards' ? 'btn-primary' : 'btn-ghost'}`}
+                    className={`btn btn-sm flex-1 sm:flex-none ${viewMode === 'cards' ? 'btn-primary' : 'btn-ghost'}`}
                     onClick={() => setViewMode('cards')}
                   >
                     Cards
                   </button>
                   <button 
-                    className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-ghost'}`}
+                    className={`btn btn-sm flex-1 sm:flex-none ${viewMode === 'table' ? 'btn-primary' : 'btn-ghost'}`}
                     onClick={() => setViewMode('table')}
                   >
                     Table
@@ -267,7 +259,7 @@ const SchoolsPage = () => {
                 {/* Add Button */}
                 <button
                   onClick={handleAddCenter}
-                  className="btn btn-primary gap-2"
+                  className="btn btn-primary gap-2 w-full sm:w-auto"
                 >
                   <Plus className="w-5 h-5" />
                   Add School
@@ -341,9 +333,9 @@ const SchoolsPage = () => {
                 
                 {/* Table View */}
                 {viewMode === "table" && (
-                  <div className="card bg-base-100 shadow-xl">
+                  <div className="card bg-base-100 shadow-xl min-w-0">
                     <div className="card-body p-0">
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto min-w-0">
                         <table className="table table-zebra">
                           <thead>
                             <tr>

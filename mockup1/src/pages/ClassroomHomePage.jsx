@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router";
 import AppLayout from "../components/AppLayout";
 import ClassroomInviteModal from "../components/ClassroomInviteModal";
 import ClassroomUploadModal from "../components/ClassroomUploadModal";
+import NotesSection from "../components/NotesSection.jsx";
 import { LanguageDevelopmentCharts } from "../components/LanguageDevelopmentCharts";
 import {
   School,
@@ -369,16 +370,6 @@ const ClassroomHomePage = () => {
                     <Mic className="w-4 h-4" />
                     Record
                   </button>
-                  {canDelete && (
-                    <button
-                      onClick={() => setShowDeleteModal(true)}
-                      className="btn btn-outline btn-error gap-2 w-full sm:w-auto"
-                      title="Delete classroom"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete Classroom
-                    </button>
-                  )}
                 </div>
               )}
             </div>
@@ -407,7 +398,14 @@ const ClassroomHomePage = () => {
                           key={childId}
                           className="py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-3"
                         >
-                          <span className="font-medium truncate">{child.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/data/child/${childId}`)}
+                            className="font-medium truncate link link-hover text-left max-w-full"
+                            title={`View ${child.name}'s data`}
+                          >
+                            {child.name}
+                          </button>
                           <div className="flex items-center gap-3 min-w-0">
                             {/* Parent attribution is admin/teacher-only; the
                                 parent variant never sees the full roster. */}
@@ -523,6 +521,13 @@ const ClassroomHomePage = () => {
               </div>
             )}
 
+            <NotesSection
+              scope="classroom"
+              scopeId={id}
+              canWrite={!isParentView}
+              className="mb-6"
+            />
+
             {/* Transcripts card — last 365 days of classroom recordings */}
             <div className="card bg-base-100 shadow border border-base-200 mt-8">
               <div className="card-body p-4 sm:p-5">
@@ -567,7 +572,7 @@ const ClassroomHomePage = () => {
                     days will appear here.
                   </p>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-4 min-w-0">
                     {transcripts.map((rec) => {
                       // Surface "who recorded this" on the classroom variant
                       // since recordings here can span multiple uploaders;
@@ -602,6 +607,27 @@ const ClassroomHomePage = () => {
                 )}
               </div>
             </div>
+
+            {canDelete && !isParentView && (
+              <details className="mt-10 pt-4 border-t border-base-200 max-w-3xl">
+                <summary
+                  className="text-xs text-base-content/45 cursor-pointer select-none hover:text-base-content/60 transition-colors [&::-webkit-details-marker]:hidden"
+                >
+                  Advanced options
+                </summary>
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteModal(true)}
+                    className="btn btn-ghost btn-xs text-base-content/50 hover:text-error hover:bg-error/5 gap-1 normal-case font-normal"
+                    title="Permanently delete this classroom"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Delete classroom
+                  </button>
+                </div>
+              </details>
+            )}
           </div>
 
       {/* Modals */}

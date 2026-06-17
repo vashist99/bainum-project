@@ -99,4 +99,46 @@ describe("NotificationBell — routeTargetForNotification", () => {
         assert.equal(routeTargetForNotification(null), null);
         assert.equal(routeTargetForNotification(undefined), null);
     });
+
+    test("child-note-added routes to child data page", () => {
+        assert.equal(
+            routeTargetForNotification({
+                type: "child-note-added",
+                childId: "64b0000000000000000000c1",
+            }),
+            "/data/child/64b0000000000000000000c1"
+        );
+        assert.equal(
+            routeTargetForNotification({ type: "child-note-added" }),
+            null
+        );
+    });
+
+    test("classroom-note-added routes to classroom homepage", () => {
+        assert.equal(
+            routeTargetForNotification({
+                type: "classroom-note-added",
+                classroomId: "64b0000000000000000000aa",
+            }),
+            "/classrooms/64b0000000000000000000aa"
+        );
+        assert.equal(
+            routeTargetForNotification({ type: "classroom-note-added" }),
+            null
+        );
+    });
+
+    test("classroom-recording-added routes to classroom homepage", () => {
+        assert.equal(
+            routeTargetForNotification({
+                type: "classroom-recording-added",
+                classroomId: "64b0000000000000000000aa",
+            }),
+            "/classrooms/64b0000000000000000000aa"
+        );
+        assert.equal(
+            routeTargetForNotification({ type: "classroom-recording-added" }),
+            null
+        );
+    });
 });

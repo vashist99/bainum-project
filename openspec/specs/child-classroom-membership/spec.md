@@ -131,82 +131,6 @@ id.
 - **WHEN** a teacher has no classrooms and no grants
 - **THEN** the helper returns an empty array
 
-### Requirement: Admin can manually enroll or remove a child in a classroom
-
-The system SHALL expose `PATCH /api/classrooms/:id/children` so that an
-admin can add or remove an individual child's classroom membership
-without going through a parent invitation. The endpoint MUST:
-
-- Reject any caller whose role is not `"admin"` with 403 (lead and
-  assistant teachers MUST receive 403 too — this is admin-only).
-- Reject unauthenticated callers with 401.
-- Accept a JSON body containing exactly one of `addChildId` or
-  `removeChildId`; supplying both or neither MUST return 400.
-- On `addChildId`: verify the child's effective center matches the
-  classroom's center; if it does not, return 409. On success, perform
-  `$addToSet` on both `Child.classrooms` (for that child) and
-  `Classroom.children` (for that classroom).
-- On `removeChildId`: perform `$pull` on both `Child.classrooms`
-  and `Classroom.children`. Removing a child whose id is not actually
-  in the classroom MUST return 200 with `changed: false` (idempotent).
-- NOT add or remove any parents; parent membership continues to be
-  governed by the invitation acceptance flow.
-
-Lead and assistant teachers MUST NOT see any UI affordance backed by
-this endpoint on the classroom homepage; only admins MUST see the
-"Add child" / "Remove child" controls.
-
-#### Scenario: Admin adds a same-center child
-- **WHEN** an admin sends `PATCH /api/classrooms/<id>/children` with
-  `{ "addChildId": "<child>" }` and the child's center matches the
-  classroom's center
-- **THEN** the response is 200 with `changed: true`
-- **AND** the child's `classrooms` array contains the classroom id
-- **AND** the classroom's `children` array contains the child id
-
-#### Scenario: Admin adds a cross-center child
-- **WHEN** an admin sends `addChildId` for a child whose center does
-  not match the classroom
-- **THEN** the response is 409 and no state is changed
-
-#### Scenario: Admin removes a child
-- **WHEN** an admin sends `PATCH /api/classrooms/<id>/children` with
-  `{ "removeChildId": "<child>" }` and the child is currently in the
-  classroom
-- **THEN** the response is 200 with `changed: true`
-- **AND** the classroom id is no longer in `Child.classrooms`
-- **AND** the child id is no longer in `Classroom.children`
-- **AND** no parent linked to that child is added or removed by this
-  operation
-
-#### Scenario: Idempotent remove
-- **WHEN** an admin sends `removeChildId` for a child that is not in
-  the classroom
-- **THEN** the response is 200 with `changed: false` and no error
-
-#### Scenario: Lead teacher is rejected
-- **WHEN** the lead teacher of the classroom calls this endpoint
-- **THEN** the response is 403
-
-#### Scenario: Assistant teacher is rejected
-- **WHEN** the assistant teacher of the classroom calls this endpoint
-- **THEN** the response is 403
-
-#### Scenario: Body validation
-- **WHEN** an admin sends a body with both `addChildId` and
-  `removeChildId`, or with neither
-- **THEN** the response is 400
-
-#### Scenario: Admin-only UI affordance
-- **WHEN** an admin opens a classroom homepage
-- **THEN** "Add child" and "Remove child" controls appear in the
-  classroom children list
-
-#### Scenario: Teachers do not see the controls
-- **WHEN** the classroom's lead or assistant teacher opens the same
-  homepage
-- **THEN** no "Add child" or "Remove child" controls are shown
-
 ### Requirement: ChildDataPage shows classroom membership in place of lead teacher
 
 `ChildDataPage` MUST replace any "Lead teacher: <name>" display with a
@@ -223,4 +147,75 @@ message such as "Not enrolled in any classroom yet."
 #### Scenario: Child not yet enrolled
 - **WHEN** the child's `classrooms` array is empty
 - **THEN** the page shows the empty-state message in the same slot
+
+### Requirement: Admin or lead teacher can remove a child from a classroom
+
+The system SHALL expose `DELETE /api/classrooms/:id/children/:childId`
+so that an admin OR the classroom's lead teacher can remove a single
+child's membership from one classroom. The endpoint MUST:
+
+- Reject unauthenticated callers with 401.
+- Reject parents and assistant teachers with 403 (only admins and the
+  specific classroom's lead teacher are allowed).
+- Reject `:id` and `:childId` that are not valid Mongo ObjectIds with 400.
+- Return 404 if the classroom does not exist.
+- Return `200 { changed: false, parentPruned: null }` (idempotent) if
+  the child is not currently in the classroom.
+- On a successful pull, perform in a single classroom update:
+  `$pull` of the child id from `Classroom.children[]`, AND — when the
+  child's parent has no other child remaining in the classroom — `$pull`
+  of that parent id from `Classroom.parents[]`. Separately,
+  `$pull` the classroom id from `Child.classrooms[]` on the child
+  document.
+- NOT mutate any historical `Assessment` or `TeacherAssessment` rows.
+  `classroomId` on past recordings stays as-is; the classroom's
+  aggregates continue to include that child's prior data.
+- Trigger a `classroom-removed` in-app notification for the parent if
+  and only if the parent was pruned in this operation
+  (see `parent-notifications` capability).
+
+Response on success: `200 { changed: true, parentPruned: <parentId|null> }`.
+
+#### Scenario: Admin removes a child still leaving siblings
+- **WHEN** an admin sends `DELETE /api/classrooms/<R>/children/<C>` and
+  C's parent P has another child C2 also enrolled in R
+- **THEN** the response is `200 { changed: true, parentPruned: null }`
+- **AND** R's `children` no longer contains C but still contains C2
+- **AND** P is still in R's `parents`
+- **AND** no `classroom-removed` notification is created for P
+
+#### Scenario: Lead teacher removes the parent's last child
+- **WHEN** the classroom R's lead teacher sends
+  `DELETE /api/classrooms/<R>/children/<C>` and C is parent P's only
+  child enrolled in R
+- **THEN** the response is `200 { changed: true, parentPruned: <P> }`
+- **AND** R's `children` no longer contains C
+- **AND** R's `parents` no longer contains P
+- **AND** C's `classrooms` no longer contains R
+- **AND** exactly one `classroom-removed` notification is created for P
+
+#### Scenario: Idempotent on a child that wasn't in the room
+- **WHEN** an admin sends DELETE for a child id that is not in R's
+  `children`
+- **THEN** the response is `200 { changed: false, parentPruned: null }`
+- **AND** no state is mutated and no notification is created
+
+#### Scenario: Assistant teacher denied
+- **WHEN** the classroom's assistant teacher calls the DELETE endpoint
+- **THEN** the response is 403 and no state is mutated
+
+#### Scenario: Unrelated teacher denied
+- **WHEN** a teacher who is neither lead nor assistant of R calls the
+  DELETE endpoint on R
+- **THEN** the response is 403
+
+#### Scenario: Parent denied
+- **WHEN** a parent (even an enrolled one) calls the DELETE endpoint
+- **THEN** the response is 403
+
+#### Scenario: Past recordings keep their classroom attribution
+- **WHEN** C is removed from R via this endpoint
+- **AND** C had recorded Assessment rows with `classroomId: <R>`
+- **THEN** none of those Assessment rows are mutated or deleted; their
+  `classroomId` still equals `<R>`
 

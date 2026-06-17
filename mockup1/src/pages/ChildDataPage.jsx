@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import AppLayout from "../components/AppLayout";
-import { ArrowLeft, User, Calendar, Languages, Stethoscope, Users, FileText, BookOpen, MessageCircle, Microscope, Brain, Plus, Trash2, Download, Mail } from "lucide-react";
+import { ArrowLeft, User, UserRound, Calendar, Languages, Stethoscope, Users, School, ChevronDown, FileText, BookOpen, MessageCircle, Microscope, Brain, Trash2, Download, Mail } from "lucide-react";
 import { LanguageDevelopmentCharts } from "../components/LanguageDevelopmentCharts";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
@@ -9,6 +9,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { getPrimaryChildId, parentHasAccessToChild } from "../utils/parentChildren.js";
 import { highlightRAGSegments, getSegmentsForHighlighting } from "../utils/ragHighlightSegments.js";
 import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
+import { classroomRefId, classroomRefName } from "../utils/classroomMembershipUi.js";
+import { compareAssessmentsNewestFirst } from "../utils/assessmentSort.js";
+import NotesSection from "../components/NotesSection.jsx";
 
 const ChildDataPage = () => {
   const { childId } = useParams();
@@ -18,12 +21,11 @@ const ChildDataPage = () => {
   const [parentChildren, setParentChildren] = useState([]);
   const [loadingParentChildren, setLoadingParentChildren] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [notes, setNotes] = useState([]);
-  const [newNote, setNewNote] = useState("");
   const [, setLatestAssessment] = useState(null);
   const [allAssessments, setAllAssessments] = useState([]);
   const [viewMode, setViewMode] = useState("dotmatrix"); // "dotmatrix" or "semicircular"
-  const [allChildren, setAllChildren] = useState([]);
+  const [classmates, setClassmates] = useState([]);
+  const [loadingClassmates, setLoadingClassmates] = useState(false);
   const [cohortThresholdsByCategory, setCohortThresholdsByCategory] = useState(null);
   /** Teacher must have parent-approved access; until then show invite UI */
   const [teacherAccessDenied, setTeacherAccessDenied] = useState(false);
@@ -132,31 +134,9 @@ const ChildDataPage = () => {
     fetchChild();
   }, [childId, user, navigate]);
 
-  // Load notes from database
-  useEffect(() => {
-    const fetchNotes = async () => {
-      if (teacherAccessDenied) return;
-      if (childId) {
-        try {
-          const response = await axios.get(`/api/notes/child/${childId}`);
-          setNotes(response.data.notes || []);
-        } catch (error) {
-          // Only log if it's not a 404 (which is expected if no notes exist)
-          if (error.response?.status !== 404) {
-          console.error("Error fetching notes:", error);
-          }
-          setNotes([]);
-        }
-      }
-    };
-
-    fetchNotes();
-  }, [childId, teacherAccessDenied]);
-
   // Load latest assessment from database
   useEffect(() => {
     const fetchLatestAssessment = async () => {
-      if (teacherAccessDenied) return;
       if (childId) {
         try {
           const response = await axios.get(`/api/assessments/child/${childId}/latest`);
@@ -171,12 +151,11 @@ const ChildDataPage = () => {
     };
 
     fetchLatestAssessment();
-  }, [childId, teacherAccessDenied]);
+  }, [childId]);
 
   // Load all assessments from database for aggregation
   useEffect(() => {
     const fetchAllAssessments = async () => {
-      if (teacherAccessDenied) return;
       if (childId) {
         try {
           const response = await axios.get(`/api/assessments/child/${childId}`);
@@ -189,7 +168,7 @@ const ChildDataPage = () => {
     };
 
     fetchAllAssessments();
-  }, [childId, teacherAccessDenied]);
+  }, [childId]);
 
   // Load cohort WPM stats for children (used for semicircular dial zones)
   useEffect(() => {
@@ -198,64 +177,52 @@ const ChildDataPage = () => {
     }).catch(() => setCohortThresholdsByCategory(null));
   }, []);
 
-  // Load all children for the Classmates panel (admin / teacher views).
-  // Lead-teacher data is no longer needed here; classroom membership lives on
-  // the child record itself (`child.classrooms`).
+  // Classmates: roster members from shared classrooms (admin / teacher only).
   useEffect(() => {
-    const fetchChildren = async () => {
-      if (!(isAdmin() || isTeacher())) return;
-      try {
-        const childrenResponse = await axios.get("/api/children");
-        setAllChildren(childrenResponse.data.children || []);
-      } catch (error) {
-        console.error("Error fetching children:", error);
-        setAllChildren([]);
-      }
-    };
-
-    fetchChildren();
-  }, [isAdmin, isTeacher]);
-
-  const handleAddNote = async () => {
-    if (!newNote.trim()) {
-      toast.error("Please enter a note");
+    if (teacherAccessDenied || !(isAdmin() || isTeacher())) {
+      setClassmates([]);
       return;
     }
-
-    try {
-      const noteData = {
-        childId,
-        content: newNote,
-        author: user?.name || "Unknown User",
-        authorId: user?.id
-      };
-
-      const response = await axios.post("/api/notes", noteData);
-      
-      // Add the new note to the list
-      setNotes([response.data.note, ...notes]);
-      setNewNote("");
-      toast.success("Note added successfully!");
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || "Failed to add note";
-      toast.error(errorMessage);
-      console.error("Error adding note:", error);
+    const rooms = child?.classrooms;
+    if (!Array.isArray(rooms) || rooms.length === 0) {
+      setClassmates([]);
+      return;
     }
-  };
-
-  const handleDeleteNote = async (noteId) => {
-    if (window.confirm("Are you sure you want to delete this note?")) {
+    let cancelled = false;
+    const loadClassmates = async () => {
+      setLoadingClassmates(true);
       try {
-        await axios.delete(`/api/notes/${noteId}`);
-        setNotes(notes.filter(note => note._id !== noteId));
-        toast.success("Note deleted successfully!");
+        const roomIds = [...new Set(rooms.map(classroomRefId).filter(Boolean))];
+        const results = await Promise.allSettled(
+          roomIds.map((id) => axios.get(`/api/classrooms/${id}`))
+        );
+        if (cancelled) return;
+        const seen = new Set();
+        const mates = [];
+        const currentId = String(childId);
+        for (const result of results) {
+          if (result.status !== "fulfilled") continue;
+          for (const c of result.value.data?.classroom?.children || []) {
+            const id = String(c.id ?? c._id ?? "");
+            if (!id || id === currentId || seen.has(id)) continue;
+            seen.add(id);
+            mates.push({ id, name: c.name || "Child" });
+          }
+        }
+        mates.sort((a, b) => a.name.localeCompare(b.name));
+        setClassmates(mates);
       } catch (error) {
-        const errorMessage = error.response?.data?.message || "Failed to delete note";
-        toast.error(errorMessage);
-        console.error("Error deleting note:", error);
+        console.error("Error loading classmates:", error);
+        if (!cancelled) setClassmates([]);
+      } finally {
+        if (!cancelled) setLoadingClassmates(false);
       }
-    }
-  };
+    };
+    loadClassmates();
+    return () => {
+      cancelled = true;
+    };
+  }, [child, childId, teacherAccessDenied, isAdmin, isTeacher]);
 
   const handleSendInviteToParent = async () => {
     if (!inviteEmail.trim()) {
@@ -356,6 +323,8 @@ const ChildDataPage = () => {
   };
 
   const ageInMonths = calculateAgeInMonths(child?.dateOfBirth);
+  const enrolledClassrooms = Array.isArray(child?.classrooms) ? child.classrooms : [];
+  const classroomCount = enrolledClassrooms.length;
 
   if (loading) {
     return (
@@ -369,25 +338,96 @@ const ChildDataPage = () => {
     );
   }
 
-  if (isTeacher() && teacherAccessDenied && childPreview) {
+  if (!child && !(isTeacher() && teacherAccessDenied && childPreview)) {
     return (
       <AppLayout>
-        <div className="container mx-auto p-4 md:p-6 max-w-2xl">
-          <button
-            type="button"
-            onClick={() => navigate("/data")}
-            className="btn btn-ghost btn-circle mb-4"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="card bg-base-100 shadow-xl">
+        <div className="container mx-auto p-6">
+          <div className="alert alert-warning">
+            <span>Child not found</span>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const displayChild = child || childPreview;
+  const showFullProfile = !!child && !teacherAccessDenied;
+
+  return (
+    <AppLayout>
+      <div className="container mx-auto p-4 md:p-6 max-w-6xl">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            {user?.role !== 'parent' && (
+            <button
+              onClick={() => navigate("/data")}
+              className="btn btn-ghost btn-circle flex-shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+            </button>
+            )}
+            <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent truncate">
+              {displayChild?.name || 'Child'}&apos;s Data
+            </h1>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            {isParent() && showFullProfile && (
+              <div className="form-control">
+                <label className="label py-0 pb-1">
+                  <span className="label-text text-xs">Child</span>
+                </label>
+                <select
+                  className="select select-bordered select-primary min-w-[180px]"
+                  value={String(child?._id || childId || "")}
+                  disabled={loadingParentChildren}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    if (nextId && String(nextId) !== String(childId)) {
+                      navigate(`/data/child/${nextId}`);
+                    }
+                  }}
+                >
+                  {loadingParentChildren ? (
+                    <option value={String(child?._id || childId || "")}>Loading children...</option>
+                  ) : parentChildren.length > 0 ? (
+                    parentChildren.map((pc) => (
+                      <option key={pc._id || pc.id} value={String(pc._id || pc.id)}>
+                        {pc.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={String(child?._id || childId || "")}>
+                      {child?.name || "Selected child"}
+                    </option>
+                  )}
+                </select>
+              </div>
+            )}
+            {showFullProfile && (
+            <div className="form-control">
+              <select
+                className="select select-bordered select-primary"
+                value={viewMode}
+                onChange={(e) => setViewMode(e.target.value)}
+              >
+                <option value="dotmatrix">Dot Matrix</option>
+                <option value="semicircular">Semicircular Dials</option>
+              </select>
+            </div>
+            )}
+          </div>
+        </div>
+
+        {isTeacher() && teacherAccessDenied && childPreview && (
+          <div className="card bg-base-100 shadow-xl mb-6 border border-warning/30">
             <div className="card-body">
-              <h2 className="card-title text-xl">Access needed: {childPreview.name}</h2>
+              <h2 className="card-title text-xl">Full access pending</h2>
               <p className="text-base-content/80">
-                A parent must accept an invitation linked to this child before you can view their full data and
-                assessments. Send an invitation to the parent&apos;s email below (same flow as the Data page).
+                Parent home recordings and classroom transcripts for this child are shown below.
+                Send an invitation for full profile access (charts, notes, and all demographics).
               </p>
-              <div className="form-control w-full mt-4">
+              <div className="form-control w-full mt-2">
                 <label className="label"><span className="label-text">Parent email</span></label>
                 {parentInviteAlreadySent ? (
                   <div className="flex items-center gap-2">
@@ -421,88 +461,10 @@ const ChildDataPage = () => {
               </div>
             </div>
           </div>
-        </div>
-      </AppLayout>
-    );
-  }
+        )}
 
-  if (!child) {
-    return (
-      <AppLayout>
-        <div className="container mx-auto p-6">
-          <div className="alert alert-warning">
-            <span>Child not found</span>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  return (
-    <AppLayout>
-      <div className="container mx-auto p-4 md:p-6 max-w-6xl">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            {user?.role !== 'parent' && (
-            <button
-              onClick={() => navigate("/data")}
-              className="btn btn-ghost btn-circle flex-shrink-0"
-            >
-              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-            </button>
-            )}
-            <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent truncate">
-              {child?.name || 'Child'}'s Data
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            {isParent() && (
-              <div className="form-control">
-                <label className="label py-0 pb-1">
-                  <span className="label-text text-xs">Child</span>
-                </label>
-                <select
-                  className="select select-bordered select-primary min-w-[180px]"
-                  value={String(child?._id || childId || "")}
-                  disabled={loadingParentChildren}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    if (nextId && String(nextId) !== String(childId)) {
-                      navigate(`/data/child/${nextId}`);
-                    }
-                  }}
-                >
-                  {loadingParentChildren ? (
-                    <option value={String(child?._id || childId || "")}>Loading children...</option>
-                  ) : parentChildren.length > 0 ? (
-                    parentChildren.map((pc) => (
-                      <option key={pc._id || pc.id} value={String(pc._id || pc.id)}>
-                        {pc.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option value={String(child?._id || childId || "")}>
-                      {child?.name || "Selected child"}
-                    </option>
-                  )}
-                </select>
-              </div>
-            )}
-            {/* View Mode Dropdown */}
-            <div className="form-control">
-              <select
-                className="select select-bordered select-primary"
-                value={viewMode}
-                onChange={(e) => setViewMode(e.target.value)}
-              >
-                <option value="dotmatrix">Dot Matrix</option>
-                <option value="semicircular">Semicircular Dials</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
+        {showFullProfile && (
+        <>
         {/* Child Info Card */}
         <div className="card bg-base-100 shadow-xl mb-6">
           <div className="card-body">
@@ -529,9 +491,9 @@ const ChildDataPage = () => {
                 </div>
               </div>
 
-              <div className="stat bg-base-200 rounded-lg">
+              <div className="stat bg-base-200 rounded-lg min-w-0">
                 <div className="stat-figure text-accent">
-                  <Users className="w-8 h-8" />
+                  <UserRound className="w-8 h-8" />
                 </div>
                 <div className="stat-title">Gender</div>
                 <div className="stat-value text-2xl">{child.gender}</div>
@@ -543,6 +505,53 @@ const ChildDataPage = () => {
                 </div>
                 <div className="stat-title">Primary Language</div>
                 <div className="stat-value text-2xl">{child.primaryLanguage}</div>
+              </div>
+
+              <div className="stat bg-base-200 rounded-lg min-w-0">
+                <div className="stat-figure text-primary opacity-90">
+                  <School className="w-8 h-8" />
+                </div>
+                <div className="stat-title">Classrooms</div>
+                <div className="stat-value text-2xl">
+                  {classroomCount > 0 ? classroomCount : "—"}
+                </div>
+                <div className="stat-desc min-w-0">
+                  {classroomCount === 0 ? (
+                    <span className="text-base-content/60">Not enrolled yet</span>
+                  ) : (
+                    <div className="dropdown dropdown-top dropdown-start">
+                      <button
+                        type="button"
+                        tabIndex={0}
+                        className="btn btn-ghost btn-xs h-auto min-h-0 py-0 px-0 gap-1 font-normal text-primary normal-case"
+                        aria-label={`View ${classroomCount} enrolled classroom${classroomCount === 1 ? "" : "s"}`}
+                      >
+                        <span className="truncate max-w-[9rem]">
+                          {classroomCount === 1
+                            ? classroomRefName(enrolledClassrooms[0])
+                            : `View all ${classroomCount}`}
+                        </span>
+                        <ChevronDown className="w-3 h-3 shrink-0 opacity-70" />
+                      </button>
+                      <ul
+                        tabIndex={0}
+                        className="dropdown-content z-[20] menu p-2 shadow-lg bg-base-100 rounded-box w-56 border max-h-48 overflow-y-auto"
+                      >
+                        {enrolledClassrooms.map((room) => {
+                          const id = classroomRefId(room);
+                          const name = classroomRefName(room);
+                          return (
+                            <li key={id}>
+                              <span className="truncate" title={name}>
+                                {name}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="stat bg-base-200 rounded-lg">
@@ -560,41 +569,15 @@ const ChildDataPage = () => {
                   </span>
                 </div>
               </div>
-
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-figure text-primary">
-                  <Users className="w-8 h-8" />
-                </div>
-                <div className="stat-title">Classrooms</div>
-                <div className="stat-value text-base">
-                  {Array.isArray(child.classrooms) && child.classrooms.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {child.classrooms.map((room) => {
-                        const id = typeof room === "object" ? room?._id : room;
-                        const name = typeof room === "object" && room?.name
-                          ? room.name
-                          : String(id).slice(-6);
-                        return (
-                          <span key={String(id)} className="badge badge-primary badge-lg">
-                            {name}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <span className="text-sm font-normal text-base-content/60">
-                      Not enrolled in any classroom yet
-                    </span>
-                  )}
-                </div>
-                <div className="stat-desc">School: {child.center || "—"}</div>
-              </div>
             </div>
           </div>
         </div>
 
-        {/* Classmates — children that share at least one classroom with this child. */}
-        {(isAdmin() || isTeacher()) && Array.isArray(child?.classrooms) && child.classrooms.length > 0 && (
+        {/* Classmates — other children in the same classroom roster (staff only). */}
+        {(isAdmin() || isTeacher()) &&
+          !teacherAccessDenied &&
+          Array.isArray(child?.classrooms) &&
+          child.classrooms.length > 0 && (
           <div className="card bg-base-100 shadow-xl mb-6">
             <div className="card-body">
               <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
@@ -602,64 +585,31 @@ const ChildDataPage = () => {
                 Classmates
               </h2>
               <div className="divider"></div>
-              {(() => {
-                const myClassroomIds = new Set(
-                  (child.classrooms || []).map((r) =>
-                    String(typeof r === "object" ? r?._id : r)
-                  )
-                );
-                const classmates = (allChildren || []).filter((c) => {
-                  if (String(c._id) === String(childId)) return false;
-                  const ids = (c.classrooms || []).map((r) =>
-                    String(typeof r === "object" ? r?._id : r)
-                  );
-                  return ids.some((id) => myClassroomIds.has(id));
-                });
-                if (classmates.length === 0) {
-                  return (
-                    <div className="alert alert-info">
-                      <span>No other children in the same classroom yet</span>
-                    </div>
-                  );
-                }
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {classmates.map((otherChild) => (
-                      <div
-                        key={otherChild._id}
-                        onClick={() => navigate(`/data/child/${otherChild._id}`)}
-                        className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-base-300 hover:border-primary"
+              {loadingClassmates ? (
+                <div className="py-4 flex justify-center">
+                  <span className="loading loading-spinner loading-md text-primary" />
+                </div>
+              ) : classmates.length === 0 ? (
+                <div className="alert alert-info">
+                  <span>No other children in the same classroom yet</span>
+                </div>
+              ) : (
+                <ul className="flex flex-wrap gap-2">
+                  {classmates.map((mate) => (
+                    <li key={mate.id}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/data/child/${mate.id}`)}
+                        className="btn btn-sm btn-outline btn-primary gap-2"
+                        title={`View ${mate.name}'s data`}
                       >
-                        <div className="card-body p-4">
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4 text-primary" />
-                            <h5 className="font-semibold text-sm">{otherChild.name}</h5>
-                          </div>
-                          <div className="text-xs text-base-content/60 mt-2">
-                            {otherChild.dateOfBirth && (
-                              <p>Age: {(() => {
-                                const birthDate = new Date(otherChild.dateOfBirth);
-                                const today = new Date();
-                                const yearsDiff = today.getFullYear() - birthDate.getFullYear();
-                                const monthsDiff = today.getMonth() - birthDate.getMonth();
-                                const totalMonths = yearsDiff * 12 + monthsDiff;
-                                const finalMonths = today.getDate() < birthDate.getDate() ? Math.max(0, totalMonths - 1) : totalMonths;
-                                return `${finalMonths} months`;
-                              })()}</p>
-                            )}
-                            {otherChild.gender && <p>Gender: {otherChild.gender}</p>}
-                          </div>
-                          <div className="card-actions justify-end mt-2">
-                            <button className="btn btn-xs btn-primary">
-                              View Details
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
+                        <User className="w-4 h-4" />
+                        {mate.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         )}
@@ -760,108 +710,17 @@ const ChildDataPage = () => {
           </div>
         </div>
 
-        {/* Notes Section */}
-        <div className="card bg-base-100 shadow-xl">
-          <div className="card-body">
-            <h2 className="card-title flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Notes & Observations
-              <span className="badge badge-primary">{notes.length}</span>
-            </h2>
-            <div className="divider"></div>
-            
-            {/* Add Note Form */}
-            <div className="mb-6">
-              <label className="label">
-                <span className="label-text font-semibold">Add New Note</span>
-              </label>
-              <textarea
-                className="textarea textarea-bordered w-full h-24 focus:textarea-primary"
-                placeholder="Enter your observations, notes, or comments about the child's progress..."
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && e.ctrlKey) {
-                    handleAddNote();
-                  }
-                }}
-              />
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-xs text-base-content/60">Press Ctrl+Enter to add note</span>
-                <button 
-                  onClick={handleAddNote}
-                  className="btn btn-primary btn-sm gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Note
-                </button>
-              </div>
-            </div>
+        <NotesSection
+          scope="child"
+          scopeId={childId}
+          canWrite={true}
+          className="mb-6"
+        />
+        </>
+        )}
 
-            {/* Notes List */}
-            {notes.length > 0 ? (
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Recent Notes</h3>
-                {notes.map((note) => (
-                  <div key={note._id} className="card bg-base-200">
-                    <div className="card-body p-4">
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="flex-1">
-                          <p className="text-base-content whitespace-pre-wrap">{note.content}</p>
-                          <div className="flex items-center gap-4 mt-3 text-xs text-base-content/60">
-                            <span className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {note.author}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {new Date(note.timestamp).toLocaleString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteNote(note._id)}
-                          className="btn btn-ghost btn-sm btn-circle text-error"
-                          title="Delete note"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-            <div className="alert alert-info">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                className="stroke-current shrink-0 w-6 h-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                ></path>
-              </svg>
-                <span>No notes yet. Add your first observation above!</span>
-            </div>
-            )}
-          </div>
-        </div>
-
-        {/* Transcripts Section - visible to anyone the backend already lets fetch /api/assessments/child/:id.
-            That's: admins (always), parents (their own children), and teachers (with active AccessGrant).
-            Hiding it from teachers meant their own recordings never surfaced on the child's page. */}
-        {(isAdmin() || isParent() || (isTeacher() && !teacherAccessDenied)) && (
+        {/* Transcripts — admins, parents, and teachers supervising this child (includes parent home recordings). */}
+        {(isAdmin() || isParent() || isTeacher()) && (
           <div className="card bg-base-100 shadow-xl mb-6">
             <div className="card-body">
               <div className="flex items-center justify-between mb-4">
@@ -879,7 +738,7 @@ const ChildDataPage = () => {
                         // Combine all transcripts into one file
                         const transcriptsWithDates = allAssessments
                           .filter(a => a.transcript && a.transcript.trim())
-                          .sort((a, b) => new Date(b.date) - new Date(a.date))
+                          .sort(compareAssessmentsNewestFirst)
                           .map((assessment) => {
                             const dateStr = new Date(assessment.date).toLocaleDateString('en-US', {
                               month: 'long',
@@ -898,7 +757,7 @@ const ChildDataPage = () => {
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `${child?.name || 'child'}_all_transcripts_${new Date().toISOString().split('T')[0]}.txt`;
+                        a.download = `${displayChild?.name || 'child'}_all_transcripts_${new Date().toISOString().split('T')[0]}.txt`;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
@@ -921,14 +780,14 @@ const ChildDataPage = () => {
                   <span>No transcripts available yet. Transcripts will appear here after recordings are processed and accepted.</span>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 min-w-0">
                   {allAssessments
                     .filter(a => a.transcript && a.transcript.trim())
-                    .sort((a, b) => new Date(b.date) - new Date(a.date))
+                    .sort(compareAssessmentsNewestFirst)
                     .map((assessment) => (
                       <div key={assessment._id} className="card bg-base-200 border border-base-300">
                         <div className="card-body p-4">
-                          <div className="flex justify-between items-start mb-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-start mb-3">
                             <div className="flex-1 min-w-0">
                               <h3 className="font-semibold text-lg flex items-center gap-2 flex-wrap">
                                 <Calendar className="w-4 h-4 shrink-0" />
@@ -985,12 +844,12 @@ const ChildDataPage = () => {
                               return segments.length > 0 ? (
                                 <>
                                   <RAGColorLegend />
-                                  <p className="text-sm whitespace-pre-wrap leading-relaxed text-base-content">
+                                  <p className="text-sm whitespace-pre-wrap leading-relaxed break-words text-base-content">
                                     {highlightRAGSegments(assessment.transcript, segments)}
                                   </p>
                                 </>
                               ) : (
-                                <p className="text-sm whitespace-pre-wrap leading-relaxed text-base-content">
+                                <p className="text-sm whitespace-pre-wrap leading-relaxed break-words text-base-content">
                                   {assessment.transcript}
                                 </p>
                               );

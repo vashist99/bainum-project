@@ -1,16 +1,16 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Smoke tests for the "Record Activity" flow on /home.
+ * Smoke tests for the parent Home recording flow at /home/recording.
  *
  * These tests are intentionally permissive — they verify the route guards
- * and the presence of the Record Activity affordance for the relevant roles,
+ * and the presence of the Home recording affordance for parents,
  * without depending on the recording / RevAI / OpenAI pipeline.
  */
 
-test.describe('Record Activity – route protection', () => {
-    test('/home redirects unauthenticated users back to login', async ({ page }) => {
-        await page.goto('/home');
+test.describe('Home recording – route protection', () => {
+    test('/home/recording redirects unauthenticated users back to login', async ({ page }) => {
+        await page.goto('/home/recording');
 
         // ProtectedRoute should bounce us back to the login screen.
         await page.waitForLoadState('networkidle').catch(() => {});
@@ -19,33 +19,8 @@ test.describe('Record Activity – route protection', () => {
     });
 });
 
-test.describe('Record Activity – teacher view (best-effort)', () => {
-    test('teacher sees the Record Activity card on /home', async ({ page }) => {
-        const email = process.env.TEST_TEACHER_EMAIL;
-        const password = process.env.TEST_TEACHER_PASSWORD;
-        if (!email || !password) {
-            test.skip();
-            return;
-        }
-
-        await page.goto('/');
-        await page.fill('input[type="email"]', email);
-        await page.fill('input[type="password"]', password);
-        await page.click('button[type="submit"]');
-        await page.waitForURL(/\/home|\/profile/, { timeout: 15_000 });
-
-        if (!page.url().includes('/home')) {
-            await page.goto('/home');
-        }
-
-        await expect(
-            page.getByRole('heading', { name: /Record Activity/i })
-        ).toBeVisible({ timeout: 10_000 });
-    });
-});
-
-test.describe('Record Activity – parent view (best-effort)', () => {
-    test('parent lands on /home and sees the Record Activity card', async ({ page }) => {
+test.describe('Home recording – parent view (best-effort)', () => {
+    test('parent sees Home recording page', async ({ page }) => {
         const email = process.env.TEST_PARENT_EMAIL;
         const password = process.env.TEST_PARENT_PASSWORD;
         if (!email || !password) {
@@ -60,18 +35,18 @@ test.describe('Record Activity – parent view (best-effort)', () => {
 
         // Parents now stay on /home (skipParentHomeRedirect).
         await page.waitForURL(/\/home|\/data/, { timeout: 15_000 });
-        if (!page.url().includes('/home')) {
-            await page.goto('/home');
+        if (!page.url().includes('/home/recording')) {
+            await page.goto('/home/recording');
         }
 
         await expect(
-            page.getByRole('heading', { name: /Record Activity/i })
+            page.getByRole('heading', { name: /Home Recording/i })
         ).toBeVisible({ timeout: 10_000 });
     });
 });
 
-test.describe('Record Activity – admin view (best-effort)', () => {
-    test('admin does NOT see the Record Activity card on /home', async ({ page }) => {
+test.describe('Home recording – admin view (best-effort)', () => {
+    test('admin is redirected away from /home/recording', async ({ page }) => {
         const email = process.env.TEST_ADMIN_EMAIL;
         const password = process.env.TEST_ADMIN_PASSWORD;
         if (!email || !password) {
@@ -85,17 +60,10 @@ test.describe('Record Activity – admin view (best-effort)', () => {
         await page.click('button[type="submit"]');
         await page.waitForURL(/\/home|\/data/, { timeout: 15_000 });
 
-        if (!page.url().includes('/home')) {
-            await page.goto('/home');
-        }
+        await page.goto('/home/recording');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
-        // Admins should still see the classroom upload card, but NOT Record Activity.
-        await expect(
-            page.getByRole('heading', { name: /Upload Classroom Recording/i })
-        ).toBeVisible({ timeout: 10_000 });
-
-        await expect(
-            page.getByRole('heading', { name: /Record Activity/i })
-        ).toHaveCount(0);
+        // Parent-only route — admin should not stay on the recording page.
+        await expect(page).not.toHaveURL(/\/home\/recording$/);
     });
 });

@@ -58,7 +58,7 @@ const Navbar = ({ onToggleSidebar, showSidebar = false, breadcrumbs = [] }) => {
         </a>
       </div>
       
-      <div className="navbar-end">
+      <div className="navbar-end items-center gap-1">
         <NotificationBell />
 
         {/* User Menu */}
@@ -67,14 +67,14 @@ const Navbar = ({ onToggleSidebar, showSidebar = false, breadcrumbs = [] }) => {
             type="button"
             tabIndex={0} 
             role="button" 
-            className="btn btn-ghost btn-circle avatar"
+            className="btn btn-ghost btn-circle"
             aria-label="User menu"
             aria-expanded="false"
             aria-haspopup="true"
           >
-            <div className="w-10 rounded-full bg-primary text-primary-content flex items-center justify-center">
-              <Users className="w-6 h-6" aria-hidden="true" />
-            </div>
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-content">
+              <Users className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden="true" />
+            </span>
           </button>
           <ul
             tabIndex={0}

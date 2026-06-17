@@ -37,7 +37,7 @@ scoped to that parent's own child(ren).
 - **WHEN** a teacher who is neither the classroom's lead nor its assistant opens its homepage
 - **THEN** access is denied (redirect or 403 message)
 
-### Requirement: Add parents to classroom
+### Requirement: Invite parents to classroom
 
 The classroom homepage SHALL have an **Add Parents** button (visible to
 admins, the classroom's lead teacher, and its assistant teacher in
@@ -177,21 +177,3 @@ appear.
 - **WHEN** C is the last child of parent P in this classroom
 - **THEN** the confirmation dialog includes the parent-pruning sentence
   AND the response payload's `parentPruned` field equals P's id
-
-## REMOVED Requirements
-
-### Requirement: Admin add-child affordance on classroom homepage
-
-**Reason**: The "Add child to classroom" UI block on `/classrooms/:id`
-is removed; the only enrollment path is now the renamed "Add Parents"
-flow. The backing endpoint `PATCH /api/classrooms/:id/children` is also
-removed in this change (see `classroom-management` and
-`child-classroom-membership` deltas).
-
-**Migration**: Use the "Add Parents" panel to enroll a parent and that
-parent's selected children in a single operation. There is no
-admin-only path to add a child without going through their parent.
-
-(Originally specified by `child-classroom-membership` §"Admin can
-manually enroll or remove a child in a classroom" — see that delta for
-the API-side removal.)

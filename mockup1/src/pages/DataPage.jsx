@@ -105,18 +105,17 @@ const DataPage = () => {
     }
   }, [loading, isTeacher, user, selectedTeacher, teachers]);
 
-  // Filter children by selected center. Teachers' supervised list is
-  // already scoped server-side; the center filter is primarily for admins.
+  // Filter children by selected center for admins. Teachers' supervised list
+  // is already scoped server-side — do not re-filter by center string (that
+  // hid roster members when child.center drifted from the teacher's school).
   useEffect(() => {
-    if (selectedTeacher) {
+    if (selectedTeacher && isAdmin()) {
       const filtered = children.filter((child) => child.center === selectedTeacher);
       setFilteredChildren(filtered);
+    } else if (isAdmin() || isTeacher()) {
+      setFilteredChildren(children);
     } else {
-      if (isAdmin() || isTeacher()) {
-        setFilteredChildren(children);
-      } else {
-        setFilteredChildren([]);
-      }
+      setFilteredChildren([]);
     }
   }, [selectedTeacher, children, isAdmin, isTeacher]);
 
@@ -372,7 +371,7 @@ const DataPage = () => {
 
   return (
     <AppLayout>
-      <div className="container mx-auto p-4 md:p-6">
+      <div className="container mx-auto p-4 sm:p-6 min-w-0">
         {/* DEBUG INFO - REMOVE LATER */}
         {/* <div className="alert alert-warning mb-4">
           <div>
@@ -418,10 +417,10 @@ const DataPage = () => {
                 : "View children at your school"}
             </p>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
+          <div className="flex gap-2 flex-shrink-0 w-full sm:w-auto">
             <button
               onClick={() => navigate("/children/add")}
-              className="btn btn-primary gap-2"
+              className="btn btn-primary gap-2 w-full sm:w-auto"
             >
               <UserPlus className="w-5 h-5" />
               Add Child
@@ -493,13 +492,13 @@ const DataPage = () => {
             Outer card is shared; inner body switches between Tile and Table
             renderers via `childrenViewMode`. */}
         {(selectedTeacher || (isAdmin() && children.length > 0)) && (
-          <div className="card bg-base-100 shadow-xl">
+          <div className="card bg-base-100 shadow-xl min-w-0">
             <div className="card-body">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
                 <h2 className="card-title">
                   {selectedTeacher ? `Children at ${selectedTeacher}` : "All Children"}
                 </h2>
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto shrink-0">
                   <ViewModeToggle
                     value={childrenViewMode}
                     onChange={setChildrenViewMode}
@@ -508,7 +507,7 @@ const DataPage = () => {
                   {bulkEligibleChildren.length > 0 && (
                     <button
                       type="button"
-                      className="btn btn-secondary btn-sm gap-2"
+                      className="btn btn-secondary btn-sm gap-2 w-full sm:w-auto"
                       onClick={openBulkInviteFromSelection}
                       disabled={selectedChildIdsForBulk.size === 0}
                       title={
@@ -647,7 +646,7 @@ const DataPage = () => {
                 /* Table mode — preserved structure from before; column
                    headers are now buttons wired into `cycleChildrenSort`
                    with `aria-sort` set per column. */
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto min-w-0">
                   <table className="table table-zebra">
                     <thead>
                       <tr>

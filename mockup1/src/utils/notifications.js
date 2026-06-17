@@ -34,5 +34,14 @@ export function routeTargetForNotification(n) {
     if (n.type === "classroom-removed") {
         return "/home";
     }
+    if (n.type === "child-note-added" && n.childId) {
+        return `/data/child/${n.childId}`;
+    }
+    if (n.type === "classroom-note-added" && n.classroomId) {
+        return `/classrooms/${n.classroomId}`;
+    }
+    if (n.type === "classroom-recording-added" && n.classroomId) {
+        return `/classrooms/${n.classroomId}`;
+    }
     return null;
 }

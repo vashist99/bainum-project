@@ -21,6 +21,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import ClassroomsPage from './pages/ClassroomsPage';
 import CreateClassroomForm from './pages/CreateClassroomForm';
 import ClassroomHomePage from './pages/ClassroomHomePage';
+import ParentHomeRecordingPage from './pages/ParentHomeRecordingPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function LegacySchoolEditRedirect() {
@@ -41,6 +42,12 @@ const App = () => {
           <HomePage />
         </ProtectedRoute>
       } />
+      <Route path="/home/recording" element={
+        <ProtectedRoute requiredRole="parent">
+          <ParentHomeRecordingPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/my-classrooms" element={<Navigate to="/home" replace />} />
       <Route path="/classrooms" element={
         <ProtectedRoute requiredRole="admin">
           <ClassroomsPage />

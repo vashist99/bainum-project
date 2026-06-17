@@ -215,7 +215,7 @@ const TeacherProfilePage = () => {
                 <span>No transcripts yet. Upload a classroom recording to get started.</span>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 min-w-0">
                 {[...transcriptsWithContent]
                   .sort((a, b) => new Date(b.date) - new Date(a.date))
                   .map((assessment) => (

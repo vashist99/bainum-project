@@ -73,7 +73,7 @@ export default function TranscriptRecordCard({
             className="card bg-base-200 border border-base-300"
         >
             <div className="card-body p-4">
-                <div className="flex justify-between items-start mb-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-start mb-2">
                     <div className="flex-1 min-w-0">
                         <h3 className="font-semibold flex items-center gap-2 flex-wrap">
                             <Calendar className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -104,7 +104,7 @@ export default function TranscriptRecordCard({
                         <button
                             type="button"
                             onClick={handleDelete}
-                            className="btn btn-ghost btn-sm btn-circle text-error"
+                            className="btn btn-ghost btn-circle text-error min-h-11 min-w-11 h-11 w-11 self-end sm:self-start shrink-0"
                             title="Delete transcript"
                             aria-label="Delete transcript"
                         >
@@ -117,12 +117,12 @@ export default function TranscriptRecordCard({
                     {hasRagHighlights ? (
                         <>
                             <RAGColorLegend />
-                            <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed break-words">
                                 {highlightRAGSegments(transcript, segments)}
                             </p>
                         </>
                     ) : (
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed break-words">
                             {transcript}
                         </p>
                     )}

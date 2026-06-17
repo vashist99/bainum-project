@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import AppLayout from "../components/AppLayout";
+import SearchField from "../components/SearchField";
 import ClassroomCard from "../components/ClassroomCard";
-import { Plus, School, Search } from "lucide-react";
+import { Plus, School } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 
@@ -69,16 +70,12 @@ const ClassroomsPage = () => {
             </div>
 
             <div className="form-control w-full max-w-md mb-6">
-              <label className="input input-bordered flex items-center gap-2">
-                <Search className="w-4 h-4 text-base-content/50" />
-                <input
-                  type="text"
-                  className="grow"
-                  placeholder="Search by classroom, teacher, or center..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </label>
+              <SearchField
+                inputSize=""
+                placeholder="Search by classroom, teacher, or center..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
 
             {loading ? (

@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 const {
     canRemoveChildFromClassroom,
     REMOVE_CHILD_MODAL_BULLETS,
+    classroomRefId,
+    classroomRefName,
 } = await import("../../src/utils/classroomMembershipUi.js");
 
 describe("canRemoveChildFromClassroom", () => {
@@ -53,6 +55,20 @@ describe("canRemoveChildFromClassroom", () => {
             }),
             false
         );
+    });
+});
+
+describe("classroomRefId / classroomRefName", () => {
+    test("classroomRefName uses populated name", () => {
+        assert.equal(
+            classroomRefName({ _id: "abc123", name: "Room A" }),
+            "Room A"
+        );
+    });
+
+    test("classroomRefId normalizes object and string refs", () => {
+        assert.equal(classroomRefId({ _id: "abc123" }), "abc123");
+        assert.equal(classroomRefId("abc123"), "abc123");
     });
 });
 

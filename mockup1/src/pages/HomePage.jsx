@@ -2,16 +2,15 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import AppLayout from "../components/AppLayout";
 import ClassroomCard from "../components/ClassroomCard";
-import { Sparkles, Radio, ArrowRight, Plus, School, LayoutGrid } from "lucide-react";
+import ParentEnrolledClassrooms from "../components/ParentEnrolledClassrooms";
+import { Sparkles, ArrowRight, Plus, School, LayoutGrid } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { getPrimaryChildId } from "../utils/parentChildren.js";
 import axios from "../lib/axios";
-import ActivityRecordingModal from "../components/ActivityRecordingModal";
 
 const HomePage = () => {
   const navigate = useNavigate();
   const { isAdmin, isParent, isTeacher, user } = useAuth();
-  const [showActivityModal, setShowActivityModal] = useState(false);
   const [classrooms, setClassrooms] = useState([]);
   const [classroomsLoading, setClassroomsLoading] = useState(false);
 
@@ -19,10 +18,9 @@ const HomePage = () => {
     { label: "Dashboard", href: "/home" }
   ];
 
-  // Teachers see cards for every classroom they lead or assist; parents see
-  // cards for the classrooms their children are enrolled in.
+  // Teachers see cards for every classroom they lead or assist.
   useEffect(() => {
-    if (!isTeacher() && !isParent()) return;
+    if (!isTeacher()) return;
     setClassroomsLoading(true);
     axios.get("/api/classrooms")
       .then((res) => setClassrooms(res.data.classrooms || []))
@@ -30,11 +28,6 @@ const HomePage = () => {
       .finally(() => setClassroomsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
-
-  const handleActivitySuccess = () => {
-    const primary = getPrimaryChildId(user);
-    if (primary) navigate(`/data/child/${primary}`);
-  };
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -147,87 +140,37 @@ const HomePage = () => {
               </div>
             )}
 
-            {/* Parent: classrooms their children are enrolled in (no stat cards) */}
+            {/* Parent: classrooms their children are enrolled in */}
             {isParent() && (
               <>
                 <div className="mb-8">
                   <h2 className="text-xl font-bold text-base-content mb-4 flex items-center gap-2">
                     <School className="w-5 h-5 text-primary" />
-                    My Children's Classrooms
+                    My Children&apos;s Classrooms
                   </h2>
-                  {classroomsLoading ? (
-                    <div className="flex justify-center py-12">
-                      <span className="loading loading-spinner loading-lg text-primary" />
-                    </div>
-                  ) : classrooms.length > 0 ? (
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                      {classrooms.map((classroom) => (
-                        <ClassroomCard key={classroom.id} classroom={classroom} variant="parent" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="card bg-base-100 shadow-xl border border-dashed border-base-300">
-                      <div className="card-body items-center text-center py-10">
-                        <div className="bg-primary/10 p-4 rounded-full mb-2">
-                          <School className="w-8 h-8 text-primary" />
-                        </div>
-                        <h3 className="card-title">No classrooms yet</h3>
-                        <p className="text-base-content/70 max-w-md">
-                          Classrooms will appear here once your child's teacher or an
-                          admin enrolls them in a classroom.
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                  <ParentEnrolledClassrooms />
                 </div>
-                <div className="mt-8">
-                  <h2 className="text-xl font-bold text-base-content mb-4">Recording Tools</h2>
-                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-4xl">
-                    <button
-                      onClick={() => setShowActivityModal(true)}
-                      className="card bg-base-100 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-200 text-left border border-base-200 hover:border-error/50"
+                {getPrimaryChildId(user) && (
+                  <div className="max-w-md">
+                    <a
+                      href={`/data/child/${getPrimaryChildId(user)}`}
+                      className="card bg-base-100 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-200 border border-base-200 hover:border-secondary/50"
                     >
                       <div className="card-body p-6">
-                        <div className="bg-error/10 p-3 rounded-lg w-fit mb-3">
-                          <Radio className="h-6 w-6 text-error" />
+                        <div className="bg-secondary/10 p-3 rounded-lg w-fit mb-3">
+                          <ArrowRight className="h-6 w-6 text-secondary" />
                         </div>
-                        <h3 className="card-title text-lg">Record Activity</h3>
+                        <h3 className="card-title text-lg">View My Child&apos;s Data</h3>
                         <p className="text-sm text-base-content/70 mt-2">
-                          Record now — shared with every child linked to you.
+                          See assessments, transcripts, and WPM progress.
                         </p>
                       </div>
-                    </button>
-
-                    {getPrimaryChildId(user) && (
-                      <a
-                        href={`/data/child/${getPrimaryChildId(user)}`}
-                        className="card bg-base-100 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-200 border border-base-200 hover:border-secondary/50"
-                      >
-                        <div className="card-body p-6">
-                          <div className="bg-secondary/10 p-3 rounded-lg w-fit mb-3">
-                            <ArrowRight className="h-6 w-6 text-secondary" />
-                          </div>
-                          <h3 className="card-title text-lg">View My Child's Data</h3>
-                          <p className="text-sm text-base-content/70 mt-2">
-                            See assessments, transcripts, and WPM progress.
-                          </p>
-                        </div>
-                      </a>
-                    )}
+                    </a>
                   </div>
-                </div>
+                )}
               </>
             )}
           </div>
-
-      {/* Parent activity recording modal (opened from the Record Activity card) */}
-      {showActivityModal && (
-        <ActivityRecordingModal
-          role="parent"
-          onSuccess={handleActivitySuccess}
-          onClose={() => setShowActivityModal(false)}
-        />
-      )}
     </AppLayout>
   );
 };

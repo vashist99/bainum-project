@@ -1,35 +1,34 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import {
   Home, Users, Building2, BarChart3, UserCircle, Settings,
-  LogOut, Menu, X, ChevronDown, ChevronRight, School
+  LogOut, X, ChevronDown, ChevronRight, School, Radio
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { getPrimaryChildId } from "../utils/parentChildren.js";
+
+const itemClassName = (isActive) =>
+  `flex items-center justify-between w-full px-4 py-3 rounded-lg transition-all duration-200 group cursor-pointer ${
+    isActive
+      ? "bg-primary text-primary-content shadow-md"
+      : "hover:bg-base-200 text-base-content"
+  }`;
 
 const SidebarItem = ({ icon: IconComponent, label, href, isActive, onClick, hasSubmenu = false, isOpen = false, children }) => { // eslint-disable-line no-unused-vars
   const [isSubmenuOpen, setIsSubmenuOpen] = useState(isOpen);
 
   const handleClick = (e) => {
-    e.preventDefault();
     if (hasSubmenu) {
+      e.preventDefault();
       setIsSubmenuOpen(!isSubmenuOpen);
     } else if (onClick) {
+      e.preventDefault();
       onClick();
-    } else if (href) {
-      window.location.href = href;
     }
   };
 
-  return (
-    <div className="w-full">
-      <a
-        href={href || "#"}
-        onClick={handleClick}
-        className={`flex items-center justify-between w-full px-4 py-3 rounded-lg transition-all duration-200 group ${
-          isActive 
-            ? "bg-primary text-primary-content shadow-md" 
-            : "hover:bg-base-200 text-base-content"
-        }`}
-      >
+  const inner = (
+    <>
         <div className="flex items-center gap-3">
           <IconComponent className={`w-5 h-5 ${isActive ? "text-primary-content" : "text-base-content/70 group-hover:text-primary"}`} />
           <span className="font-medium">{label}</span>
@@ -43,8 +42,25 @@ const SidebarItem = ({ icon: IconComponent, label, href, isActive, onClick, hasS
             )}
           </div>
         )}
-      </a>
-      
+    </>
+  );
+
+  return (
+    <div className="w-full">
+      {href && !onClick ? (
+        <Link to={href} className={itemClassName(isActive)} onClick={handleClick}>
+          {inner}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          className={itemClassName(isActive)}
+          onClick={handleClick}
+        >
+          {inner}
+        </button>
+      )}
+
       {hasSubmenu && isSubmenuOpen && children && (
         <div className="ml-8 mt-2 space-y-1">
           {children}
@@ -56,10 +72,11 @@ const SidebarItem = ({ icon: IconComponent, label, href, isActive, onClick, hasS
 
 const Sidebar = ({ isOpen, onToggle, currentPath = "/" }) => {
   const { user, logout, isAdmin, isParent, isTeacher } = useAuth();
+  const primaryChildId = isParent() ? getPrimaryChildId(user) : null;
 
   const handleLogout = () => {
     logout();
-    window.location.href = '/';
+    window.location.href = "/";
   };
 
   const navigationItems = [
@@ -67,16 +84,35 @@ const Sidebar = ({ isOpen, onToggle, currentPath = "/" }) => {
       icon: Home,
       label: "Dashboard",
       href: "/home",
-      isActive: currentPath === "/home" || currentPath === "/"
+      isActive:
+        currentPath === "/home" ||
+        currentPath === "/" ||
+        (isParent() && currentPath.startsWith("/classrooms")),
     },
-    // Classrooms: admins get the full list; teachers land on homepage cards;
-    // parents see enrolled classrooms on the dashboard and can open each room.
-    ...(isAdmin() || isTeacher() || isParent() ? [
+    // Classrooms nav: admins get the full list; teachers land on homepage cards.
+    // Parents see enrolled classrooms on the dashboard (no separate tab).
+    ...(isAdmin() || isTeacher() ? [
       {
         icon: School,
-        label: isParent() ? "My Classrooms" : "Classrooms",
+        label: "Classrooms",
         href: isAdmin() ? "/classrooms" : "/home",
-        isActive: currentPath.startsWith("/classrooms") || (isParent() && currentPath === "/home")
+        isActive: currentPath.startsWith("/classrooms"),
+      }
+    ] : []),
+    ...(isParent() ? [
+      {
+        icon: Radio,
+        label: "Home",
+        href: "/home/recording",
+        isActive: currentPath.startsWith("/home/recording"),
+      },
+    ] : []),
+    ...(isParent() && primaryChildId ? [
+      {
+        icon: BarChart3,
+        label: "My Child's Data",
+        href: `/data/child/${primaryChildId}`,
+        isActive: currentPath.startsWith("/data/child"),
       }
     ] : []),
     ...(isAdmin() ? [
@@ -169,8 +205,8 @@ const Sidebar = ({ isOpen, onToggle, currentPath = "/" }) => {
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto p-4">
             <div className="space-y-2">
-              {navigationItems.map((item, index) => (
-                <SidebarItem key={index} {...item} />
+              {navigationItems.map((item) => (
+                <SidebarItem key={item.label} {...item} />
               ))}
             </div>
           </nav>

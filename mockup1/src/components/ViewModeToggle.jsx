@@ -16,7 +16,7 @@ import { VIEW_MODE_TILES, VIEW_MODE_TABLE } from "../hooks/useViewMode.js";
  *
  * @param {{ value: string, onChange: (mode: string) => void, ariaLabel?: string }} props
  */
-export default function ViewModeToggle({ value, onChange, ariaLabel = "View mode" }) {
+export default function ViewModeToggle({ value, onChange, ariaLabel = "View mode", className = "" }) {
     const tilesRef = useRef(null);
     const tableRef = useRef(null);
 
@@ -40,7 +40,7 @@ export default function ViewModeToggle({ value, onChange, ariaLabel = "View mode
     };
 
     const segmentClass = (segment) =>
-        `btn btn-sm gap-1 ${
+        `btn btn-sm gap-1 flex-1 sm:flex-none ${
             value === segment ? "btn-primary" : "btn-ghost"
         }`;
 
@@ -48,7 +48,7 @@ export default function ViewModeToggle({ value, onChange, ariaLabel = "View mode
         <div
             role="tablist"
             aria-label={ariaLabel}
-            className="btn-group shadow-sm rounded-lg overflow-hidden"
+            className={`btn-group shadow-sm rounded-lg overflow-hidden w-full sm:w-auto ${className}`.trim()}
         >
             <button
                 ref={tilesRef}

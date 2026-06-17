@@ -19,6 +19,7 @@ import {
     fanOutClassroomRemovedNotification,
 } from "../lib/notificationService.js";
 import { readSchoolFromBody, withSchoolField } from "../lib/schoolFieldAlias.js";
+import { materializeAndSyncClassroomChildren } from "../lib/classroomMembershipSync.js";
 
 /**
  * Build the summary projection used by every classroom response. The
@@ -245,6 +246,9 @@ export const getClassroom = async (req, res) => {
         if (!auth) return;
         const { classroom, mode } = auth;
 
+        const { summaries: rosterChildren } =
+            await materializeAndSyncClassroomChildren(classroom);
+
         // Parent read-only payload: hide the full roster, surface only
         // the parent's own children. Counts come from the unfiltered
         // arrays so the parent still sees the classroom's true size.
@@ -258,13 +262,14 @@ export const getClassroom = async (req, res) => {
                     }
                 }
             }
-            const myChildren = (classroom.children || [])
-                .filter((c) => myChildIdSet.has(String(c._id)))
-                .map((c) => ({ id: c._id, name: c.name }));
+            const myChildren = rosterChildren.filter((c) =>
+                myChildIdSet.has(String(c.id))
+            );
 
             return res.status(200).json({
                 classroom: {
                     ...toClassroomSummary(classroom, req.user, "parent"),
+                    childCount: rosterChildren.length,
                     children: myChildren,
                     parents: [],
                 },
@@ -274,7 +279,8 @@ export const getClassroom = async (req, res) => {
         res.status(200).json({
             classroom: {
                 ...toClassroomSummary(classroom, req.user),
-                children: (classroom.children || []).map((c) => ({ id: c._id, name: c.name })),
+                childCount: rosterChildren.length,
+                children: rosterChildren,
                 // childIds lets the client map each child to their classroom
                 // parent(s) without an extra request.
                 parents: (classroom.parents || []).map((p) => ({
@@ -819,6 +825,11 @@ export const getClassroomTranscripts = async (req, res) => {
         }));
 
         const merged = [...childRows, ...teacherRows].sort((a, b) => {
+            const idA = a._id != null ? String(a._id) : "";
+            const idB = b._id != null ? String(b._id) : "";
+            if (idA && idB && idA !== idB) {
+                return idB.localeCompare(idA);
+            }
             const ta = a.date ? new Date(a.date).getTime() : 0;
             const tb = b.date ? new Date(b.date).getTime() : 0;
             return tb - ta;
@@ -843,7 +854,9 @@ export const getClassroomAssessments = async (req, res) => {
         if (!auth) return;
         const { classroom, mode } = auth;
 
-        let childIds = (classroom.children || []).map((c) => c._id ?? c);
+        const { childIds: rosterChildIds } =
+            await materializeAndSyncClassroomChildren(classroom);
+        let childIds = rosterChildIds;
 
         // Parent read-only: restrict assessments to the parent's own
         // children so the per-child charts they're entitled to view are
