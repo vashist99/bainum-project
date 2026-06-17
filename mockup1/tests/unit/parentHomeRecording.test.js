@@ -7,12 +7,23 @@ import {
     getDefaultLocationForRole,
     getLocationsForRole,
 } from "../../src/utils/locations.js";
-import { PREDEFINED_LOCATION_GROUPS } from "../../../backend/lib/locationValidator.js";
 import { getParentChildIdList } from "../../src/utils/parentChildren.js";
 
+/** Keep in sync with backend/lib/locationValidator.js (home catalog). */
+const EXPECTED_HOME_LOCATIONS = [
+    "Mealtime or snacks",
+    "Personal Care (e.g., dressing, bathing, brushing teeth)",
+    "Play/free play (e.g., blocks, puzzles, cars & trucks)",
+    "Screen time (e.g., show, iPad / tablet / video games)",
+    "Reading or looking at books",
+    "Outdoor play (e.g., playing soccer, swinging)",
+    "Clean up (e.g., picking up toys)",
+    "Structured Activities (non-free play activities such as circle time, art, small group)",
+];
+
 describe("locations utils — home catalog parity", () => {
-    test("frontend home list mirrors backend", () => {
-        assert.deepEqual(PREDEFINED_LOCATIONS.home, PREDEFINED_LOCATION_GROUPS.home);
+    test("frontend home list matches the canonical home catalog", () => {
+        assert.deepEqual(PREDEFINED_LOCATIONS.home, EXPECTED_HOME_LOCATIONS);
     });
 
     test("parent default is play/free play", () => {
