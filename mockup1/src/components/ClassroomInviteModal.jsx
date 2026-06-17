@@ -78,7 +78,7 @@ export default function ClassroomInviteModal({ classroomId, onInvited, onClose }
       onInvited?.();
       onClose?.();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to invite parents");
+      toast.error(error.response?.data?.message || "Failed to add parents");
     } finally {
       setSubmitting(false);
     }
@@ -91,7 +91,7 @@ export default function ClassroomInviteModal({ classroomId, onInvited, onClose }
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-xl sm:text-2xl flex items-center gap-2">
             <UserPlus className="w-6 h-6 text-primary shrink-0" />
-            Invite Parents
+            Add Parents to Classroom
           </h3>
           <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle" aria-label="Close">
             <X className="w-5 h-5" />
@@ -194,7 +194,7 @@ export default function ClassroomInviteModal({ classroomId, onInvited, onClose }
             ) : (
               <UserPlus className="w-4 h-4" />
             )}
-            Invite {selected.size > 0 ? `(${selected.size})` : ""}
+            Add {selected.size > 0 ? `(${selected.size})` : ""}
           </button>
         </div>
       </div>

@@ -4,6 +4,7 @@ import AppLayout from "../components/AppLayout";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
 import axios from "../lib/axios";
+import { schoolsFromListResponse } from "../utils/schools.js";
 
 const AddTeacherForm = () => {
   const navigate = useNavigate();
@@ -25,11 +26,11 @@ const AddTeacherForm = () => {
     const fetchCenters = async () => {
       try {
         setLoadingCenters(true);
-        const response = await axios.get("/api/centers");
-        setCenters(response.data.centers || []);
+        const response = await axios.get("/api/schools");
+        setCenters(schoolsFromListResponse(response.data));
       } catch (error) {
         console.error("Error fetching centers:", error);
-        toast.error("Failed to load centers");
+        toast.error("Failed to load schools");
         setCenters([]);
       } finally {
         setLoadingCenters(false);
@@ -232,10 +233,10 @@ const AddTeacherForm = () => {
                 />
               </div>
 
-              {/* Center Dropdown */}
+              {/* School Dropdown */}
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text font-semibold">Center</span>
+                  <span className="label-text font-semibold">School</span>
                 </label>
                 <select
                   name="center"
@@ -245,7 +246,7 @@ const AddTeacherForm = () => {
                   disabled={loadingCenters}
                 >
                   <option value="">
-                    {loadingCenters ? "Loading centers..." : "Select a center"}
+                    {loadingCenters ? "Loading schools..." : "Select a school"}
                   </option>
                   {centers.map((center) => (
                     <option key={center._id} value={center.name}>
@@ -256,7 +257,7 @@ const AddTeacherForm = () => {
                 {!loadingCenters && centers.length === 0 && (
                   <label className="label">
                     <span className="label-text-alt text-warning">
-                      No centers available. Please add centers first.
+                      No schools available. Please add schools first.
                     </span>
                   </label>
                 )}

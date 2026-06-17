@@ -299,7 +299,7 @@ const DataPage = () => {
     { key: "name", label: "Name", getter: (c) => c?.name },
     { key: "age", label: "Age", getter: (c) => getAgeInMonths(c?.dateOfBirth) },
     { key: "language", label: "Language", getter: (c) => c?.primaryLanguage },
-    { key: "center", label: "Center", getter: (c) => c?.center },
+    { key: "center", label: "School", getter: (c) => c?.center ?? c?.school },
   ];
 
   const {
@@ -410,9 +410,14 @@ const DataPage = () => {
         )}
 
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Data
-          </h1>
+          <div>
+            <h1 className="text-3xl font-bold text-base-content mb-2">Children</h1>
+            <p className="text-base-content/70">
+              {isAdmin()
+                ? "View and manage children across your schools"
+                : "View children at your school"}
+            </p>
+          </div>
           <div className="flex gap-2 flex-shrink-0">
             <button
               onClick={() => navigate("/children/add")}
@@ -441,7 +446,7 @@ const DataPage = () => {
                   <div className="alert alert-info">
                     <Users className="w-5 h-5" />
                     <span>
-                      Viewing children at your center
+                      Viewing children at your school
                       {selectedTeacher ? <>: <strong>{selectedTeacher}</strong></> : null}
                     </span>
                   </div>
@@ -457,7 +462,7 @@ const DataPage = () => {
                   <label className="label">
                     <span className="label-text font-semibold flex items-center gap-2">
                       <Users className="w-5 h-5" />
-                      Filter by Center ({centerOptions.length} available)
+                      Filter by School ({centerOptions.length} available)
                     </span>
                   </label>
                   <select
@@ -466,7 +471,7 @@ const DataPage = () => {
                     onChange={handleTeacherChange}
                     disabled={loading}
                   >
-                    <option value="">{loading ? "Loading centers..." : "All centers"}</option>
+                    <option value="">{loading ? "Loading schools..." : "All schools"}</option>
                     {centerOptions.map((centerName) => (
                       <option key={centerName} value={centerName}>
                         {centerName}
@@ -476,7 +481,7 @@ const DataPage = () => {
                 </div>
                 {!loading && centerOptions.length === 0 && (
                   <div className="alert alert-warning mt-4">
-                    <span>No centers found yet. Add teachers (each carries a center) to populate this list.</span>
+                    <span>No schools found yet. Add teachers (each carries a school) to populate this list.</span>
                   </div>
                 )}
               </div>
@@ -699,7 +704,7 @@ const DataPage = () => {
                             onClick={() => cycleChildrenSort("center")}
                             className="flex items-center gap-1 hover:underline"
                           >
-                            Center
+                            School
                             {renderSortIcon("center", childrenSort)}
                           </button>
                         </th>
@@ -805,9 +810,9 @@ const DataPage = () => {
                 <div className="bg-primary/10 p-8 rounded-full mb-6">
                   <Users className="w-16 h-16 text-primary" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2">Select a Center</h2>
+                <h2 className="text-2xl font-bold mb-2">Select a School</h2>
                 <p className="text-base-content/60 text-center max-w-md">
-                  Choose a center from the dropdown above to view children
+                  Choose a school from the dropdown above to view children
                   enrolled there, or leave it blank to see everyone.
                 </p>
               </div>

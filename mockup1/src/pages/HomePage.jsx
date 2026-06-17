@@ -139,7 +139,7 @@ const HomePage = () => {
                       </div>
                       <h3 className="card-title text-lg">View All Classrooms</h3>
                       <p className="text-sm text-base-content/70 mt-2">
-                        Browse every classroom across all centers.
+                        Browse every classroom across all schools.
                       </p>
                     </div>
                   </button>

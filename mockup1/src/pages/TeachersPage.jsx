@@ -4,6 +4,7 @@ import AppLayout from "../components/AppLayout";
 import { CardLoading, EmptyTeachers } from "../components/LoadingStates";
 import { Plus, Edit, Trash2, ChevronDown, ChevronRight, User, Users, Mail, Building2, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from "lucide-react";
 import axios from "../lib/axios";
+import { schoolsFromListResponse } from "../utils/schools.js";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 import ViewModeToggle from "../components/ViewModeToggle.jsx";
@@ -96,8 +97,8 @@ const TeachersPage = () => {
     const fetchCenters = async () => {
       if (isAdmin()) {
         try {
-          const response = await axios.get("/api/centers");
-          setCenters(response.data.centers || []);
+          const response = await axios.get("/api/schools");
+          setCenters(schoolsFromListResponse(response.data));
         } catch (error) {
           console.error("Error fetching centers:", error);
           setCenters([]);
@@ -181,7 +182,7 @@ const TeachersPage = () => {
       label: "Date of Birth",
       getter: (t) => (t?.dateOfBirth ? new Date(t.dateOfBirth).getTime() : null),
     },
-    { key: "center", label: "Center", getter: (t) => t?.center },
+    { key: "center", label: "School", getter: (t) => t?.center ?? t?.school },
     { key: "language", label: "Language", getter: (t) => getPrimaryLanguageForTeacher(t) },
     { key: "students", label: "Students", getter: (t) => getChildrenForTeacher(t).length },
   ];
@@ -590,7 +591,7 @@ const TeachersPage = () => {
                   <div className="stat-figure text-secondary">
                     <Building2 className="w-8 h-8" />
                   </div>
-                  <div className="stat-title">Centers</div>
+                  <div className="stat-title">Schools</div>
                   <div className="stat-value text-secondary">{centers.length}</div>
                   <div className="stat-desc">Locations served</div>
                 </div>
@@ -624,7 +625,7 @@ const TeachersPage = () => {
                       <label className="label">
                         <span className="label-text font-semibold flex items-center gap-2">
                           <Building2 className="w-4 h-4" />
-                          Filter by Center
+                          Filter by School
                         </span>
                       </label>
                       <select
@@ -633,7 +634,7 @@ const TeachersPage = () => {
                         onChange={(e) => setSelectedCenter(e.target.value)}
                         disabled={loading}
                       >
-                        <option value="">All centers</option>
+                        <option value="">All schools</option>
                         {centers.map((c) => (
                           <option key={c._id} value={c.name}>
                             {c.name}
@@ -665,7 +666,7 @@ const TeachersPage = () => {
                 <label className="label">
                   <span className="label-text font-semibold flex items-center gap-2">
                     <Building2 className="w-5 h-5" />
-                    Filter by Center
+                    Filter by School
                   </span>
                 </label>
                 <select
@@ -674,7 +675,7 @@ const TeachersPage = () => {
                   onChange={(e) => setSelectedCenter(e.target.value)}
                   disabled={loading}
                 >
-                  <option value="">All centers</option>
+                  <option value="">All schools</option>
                   {centers.map((c) => (
                     <option key={c._id} value={c.name}>
                       {c.name}
@@ -777,7 +778,7 @@ const TeachersPage = () => {
                                   onClick={() => cycleTeachersSort("center")}
                                   className="flex items-center gap-1 hover:underline"
                                 >
-                                  Center
+                                  School
                                   {renderSortIcon("center", teachersSort)}
                                 </button>
                               </th>

@@ -1,5 +1,6 @@
-import { Users, LogOut, Menu, Home, ChevronRight, Bell } from "lucide-react";
+import { Users, LogOut, Menu, Home, ChevronRight } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import NotificationBell from "./NotificationBell";
 
 const Navbar = ({ onToggleSidebar, showSidebar = false, breadcrumbs = [] }) => {
   const { user, logout } = useAuth();
@@ -58,30 +59,8 @@ const Navbar = ({ onToggleSidebar, showSidebar = false, breadcrumbs = [] }) => {
       </div>
       
       <div className="navbar-end">
-        {/* Notifications */}
-        <div className="dropdown dropdown-end mr-2">
-          <button 
-            type="button"
-            className="btn btn-ghost btn-circle"
-            aria-label="Notifications"
-          >
-            <div className="indicator">
-              <Bell className="w-5 h-5" />
-              <span className="badge badge-xs badge-primary indicator-item"></span>
-            </div>
-          </button>
-          <div className="dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-80">
-            <div className="p-4">
-              <h3 className="font-semibold text-sm mb-3">Notifications</h3>
-              <div className="space-y-2">
-                <div className="text-sm text-base-content/60 text-center py-4">
-                  No new notifications
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
+        <NotificationBell />
+
         {/* User Menu */}
         <div className="dropdown dropdown-end">
           <button 

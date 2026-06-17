@@ -69,22 +69,22 @@ const Sidebar = ({ isOpen, onToggle, currentPath = "/" }) => {
       href: "/home",
       isActive: currentPath === "/home" || currentPath === "/"
     },
-    // Classrooms: admins get the full list page; teachers land on their
-    // classrooms view on the homepage. Hidden for parents.
-    ...(isAdmin() || isTeacher() ? [
+    // Classrooms: admins get the full list; teachers land on homepage cards;
+    // parents see enrolled classrooms on the dashboard and can open each room.
+    ...(isAdmin() || isTeacher() || isParent() ? [
       {
         icon: School,
-        label: "Classrooms",
+        label: isParent() ? "My Classrooms" : "Classrooms",
         href: isAdmin() ? "/classrooms" : "/home",
-        isActive: currentPath.startsWith("/classrooms")
+        isActive: currentPath.startsWith("/classrooms") || (isParent() && currentPath === "/home")
       }
     ] : []),
     ...(isAdmin() ? [
       {
         icon: Building2,
-        label: "Centers",
-        href: "/centers",
-        isActive: currentPath.startsWith("/centers")
+        label: "Schools",
+        href: "/schools",
+        isActive: currentPath.startsWith("/schools") || currentPath.startsWith("/centers")
       },
       {
         icon: Users,
@@ -104,7 +104,7 @@ const Sidebar = ({ isOpen, onToggle, currentPath = "/" }) => {
     ...(!isParent() ? [
       {
         icon: BarChart3,
-        label: "Child Data",
+        label: "Children",
         href: "/data",
         isActive: currentPath.startsWith("/data")
       }

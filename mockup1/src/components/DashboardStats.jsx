@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Users, Building2, UserCheck, BookOpen, Clock } from "lucide-react";
 import axios from "../lib/axios";
+import { schoolsFromListResponse } from "../utils/schools.js";
 import { useAuth } from "../contexts/AuthContext";
 
 const StatCard = ({ icon: IconComponent, title, value, subtitle, color = "primary", loading = false }) => { // eslint-disable-line no-unused-vars
@@ -106,12 +107,12 @@ const DashboardStats = ({ onQuickAction }) => {
       try {
         setLoading(true);
         const [centersRes, teachersRes, childrenRes] = await Promise.all([
-          axios.get("/api/centers").catch(() => ({ data: { centers: [] } })),
+          axios.get("/api/schools").catch(() => ({ data: { schools: [] } })),
           axios.get("/api/teachers").catch(() => ({ data: { teachers: [] } })),
           axios.get("/api/children").catch(() => ({ data: { children: [] } }))
         ]);
 
-        const centers = centersRes.data.centers || [];
+        const centers = schoolsFromListResponse(centersRes.data);
         const teachers = teachersRes.data.teachers || [];
         const children = childrenRes.data.children || [];
 
@@ -153,7 +154,7 @@ const DashboardStats = ({ onQuickAction }) => {
           activities.push({
             icon: UserCheck,
             title: `${totalTeachers} teachers`,
-            description: "Managing children across centers",
+            description: "Managing children across schools",
             time: "Current",
             color: "primary"
           });
@@ -181,9 +182,9 @@ const DashboardStats = ({ onQuickAction }) => {
       },
       {
         icon: Building2,
-        title: "Add New Center",
-        description: "Register a new educational center",
-        onClick: () => onQuickAction?.("/centers/add"),
+        title: "Add New School",
+        description: "Register a new school",
+        onClick: () => onQuickAction?.("/schools/add"),
         color: "secondary"
       }
     ] : []),
@@ -213,7 +214,7 @@ const DashboardStats = ({ onQuickAction }) => {
             icon={Users}
             title={isTeacher() ? "My Students" : "Total Children"}
             value={stats.totalChildren}
-            subtitle={isTeacher() ? "Students under your supervision" : "Across all centers"}
+            subtitle={isTeacher() ? "Students under your supervision" : "Across all schools"}
             color="primary"
             loading={loading}
           />
@@ -223,7 +224,7 @@ const DashboardStats = ({ onQuickAction }) => {
               icon={UserCheck}
               title={isAdmin() ? "Total Teachers" : "My Classes"}
               value={isTeacher() ? "Active" : stats.totalTeachers}
-              subtitle={isAdmin() ? "Across all centers" : "Currently teaching"}
+              subtitle={isAdmin() ? "Across all schools" : "Currently teaching"}
               color="secondary"
               loading={loading}
             />
@@ -232,7 +233,7 @@ const DashboardStats = ({ onQuickAction }) => {
           {isAdmin() && (
             <StatCard
               icon={Building2}
-              title="Education Centers"
+              title="Schools"
               value={stats.totalCenters}
               subtitle="Registered locations"
               color="accent"

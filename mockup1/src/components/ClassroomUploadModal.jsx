@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Mic, Upload, Calendar, FileText, Check, X } from "lucide-react";
 import axios from "../lib/axios";
+import { schoolsFromListResponse } from "../utils/schools.js";
 import toast from "react-hot-toast";
 import { highlightRAGSegments, getSegmentsForHighlighting } from "../utils/ragHighlightSegments.js";
 import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
@@ -44,15 +45,15 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
 
   useEffect(() => {
     if (isAdmin && !isTeacherPreselected) {
-      axios.get("/api/centers").then((res) => {
-        setCenters(res.data.centers || []);
+      axios.get("/api/schools").then((res) => {
+        setCenters(schoolsFromListResponse(res.data));
       }).catch(() => setCenters([]));
     }
   }, [isAdmin, isTeacherPreselected]);
 
   useEffect(() => {
     if (isAdmin && !isTeacherPreselected && selectedCenter) {
-      axios.get(`/api/centers/${encodeURIComponent(selectedCenter)}/teachers`).then((res) => {
+      axios.get(`/api/schools/${encodeURIComponent(selectedCenter)}/teachers`).then((res) => {
         setTeachers(res.data.teachers || []);
         setSelectedTeacher("");
       }).catch(() => {
@@ -334,7 +335,7 @@ export default function ClassroomUploadModal({ isAdmin, onSuccess, onClose, pres
           <>
             <div className="form-control w-full mb-3">
               <label className="label py-1">
-                <span className="label-text font-semibold">Center</span>
+                <span className="label-text font-semibold">School</span>
               </label>
               <select
                 className="select select-bordered select-primary w-full text-base"

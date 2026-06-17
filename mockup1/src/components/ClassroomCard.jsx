@@ -6,9 +6,8 @@ import { School, User, Building2, Users } from "lucide-react";
  * and center in smaller muted text below. Shows a small "Assistant" badge when
  * the viewing teacher assists (rather than leads) this classroom.
  *
- * `variant="parent"`: the card is NOT a link to the classroom homepage
- * (parents are denied there) — instead the parent's enrolled children render
- * as chips linking to each child's data page, where classroom recordings show.
+ * `variant="parent"`: enrolled parents can open the read-only classroom
+ * homepage; child chips still link to each child's data page.
  *
  * Designed for responsive grids (grid-cols-1 sm:grid-cols-2 lg:grid-cols-3).
  */
@@ -68,9 +67,12 @@ const ClassroomCard = ({ classroom, variant = "staff" }) => {
 
   if (isParentView) {
     return (
-      <div className="card bg-base-100 shadow-xl border border-base-200 w-full">
+      <button
+        onClick={() => navigate(`/classrooms/${classroom.id}`)}
+        className="card bg-base-100 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-200 text-left border border-base-200 hover:border-primary/50 w-full"
+      >
         {body}
-      </div>
+      </button>
     );
   }
 

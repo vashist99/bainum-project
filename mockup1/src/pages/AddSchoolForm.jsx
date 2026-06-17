@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
 import axios from "../lib/axios";
 
-const AddCenterForm = () => {
+const AddSchoolForm = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -25,11 +25,10 @@ const AddCenterForm = () => {
 
   const validateForm = () => {
     if (!formData.name) {
-      toast.error("Center name is required");
+      toast.error("School name is required");
       return false;
     }
 
-    // Basic email validation if provided
     if (formData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
@@ -49,18 +48,16 @@ const AddCenterForm = () => {
     setLoading(true);
 
     try {
-      // Make API call to create center in database
-      await axios.post("/api/centers", formData);
+      await axios.post("/api/schools", formData);
 
-      toast.success("Center added successfully!");
+      toast.success("School added successfully!");
 
-      // Navigate to centers page
-      navigate("/centers");
+      navigate("/schools");
     } catch (error) {
       const errorMessage =
-        error.response?.data?.message || "Failed to add center. Please try again.";
+        error.response?.data?.message || "Failed to add school. Please try again.";
       toast.error(errorMessage);
-      console.error("Error creating center:", error);
+      console.error("Error creating school:", error);
     } finally {
       setLoading(false);
     }
@@ -71,28 +68,27 @@ const AddCenterForm = () => {
       <div className="container mx-auto p-6 max-w-2xl">
         <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => navigate("/centers")}
+            onClick={() => navigate("/schools")}
             className="btn btn-ghost btn-circle"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Add Center
+            Add School
           </h1>
         </div>
 
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Center Name */}
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text font-semibold">Center Name *</span>
+                  <span className="label-text font-semibold">School Name *</span>
                 </label>
                 <input
                   type="text"
                   name="name"
-                  placeholder="Enter center name"
+                  placeholder="Enter school name"
                   className="input input-bordered input-primary w-full"
                   value={formData.name}
                   onChange={handleInputChange}
@@ -100,7 +96,6 @@ const AddCenterForm = () => {
                 />
               </div>
 
-              {/* Address */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">Address</span>
@@ -108,14 +103,13 @@ const AddCenterForm = () => {
                 <input
                   type="text"
                   name="address"
-                  placeholder="Enter center address"
+                  placeholder="Enter school address"
                   className="input input-bordered input-primary w-full"
                   value={formData.address}
                   onChange={handleInputChange}
                 />
               </div>
 
-              {/* Phone */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">Phone</span>
@@ -130,7 +124,6 @@ const AddCenterForm = () => {
                 />
               </div>
 
-              {/* Email */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">Email</span>
@@ -138,21 +131,20 @@ const AddCenterForm = () => {
                 <input
                   type="email"
                   name="email"
-                  placeholder="center@email.com"
+                  placeholder="school@email.com"
                   className="input input-bordered input-primary w-full"
                   value={formData.email}
                   onChange={handleInputChange}
                 />
               </div>
 
-              {/* Description */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">Description</span>
                 </label>
                 <textarea
                   name="description"
-                  placeholder="Enter center description (optional)"
+                  placeholder="Enter school description (optional)"
                   className="textarea textarea-bordered textarea-primary w-full"
                   value={formData.description}
                   onChange={handleInputChange}
@@ -160,7 +152,6 @@ const AddCenterForm = () => {
                 />
               </div>
 
-              {/* Submit Button */}
               <div className="form-control mt-6">
                 <button 
                   type="submit" 
@@ -170,10 +161,10 @@ const AddCenterForm = () => {
                   {loading ? (
                     <>
                       <span className="loading loading-spinner"></span>
-                      Adding Center...
+                      Adding School...
                     </>
                   ) : (
-                    "Add Center"
+                    "Add School"
                   )}
                 </button>
               </div>
@@ -185,4 +176,4 @@ const AddCenterForm = () => {
   );
 };
 
-export default AddCenterForm;
+export default AddSchoolForm;

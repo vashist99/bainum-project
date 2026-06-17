@@ -4,6 +4,7 @@ import AppLayout from "../components/AppLayout";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
 import axios from "../lib/axios";
+import { schoolsFromListResponse } from "../utils/schools.js";
 
 const AddChildForm = () => {
   const navigate = useNavigate();
@@ -26,8 +27,8 @@ const AddChildForm = () => {
     const fetchCenters = async () => {
       try {
         setLoadingCenters(true);
-        const response = await axios.get("/api/centers");
-        setCenters(response.data.centers || []);
+        const response = await axios.get("/api/schools");
+        setCenters(schoolsFromListResponse(response.data));
       } catch (error) {
         console.error("Error fetching centers:", error);
         setCenters([]);
@@ -265,10 +266,10 @@ const AddChildForm = () => {
                 </select>
               </div>
 
-              {/* Center */}
+              {/* School */}
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text font-semibold">Center</span>
+                  <span className="label-text font-semibold">School</span>
                   <span className="label-text-alt">
                     Classrooms are set when a parent accepts an invitation
                   </span>
@@ -281,7 +282,7 @@ const AddChildForm = () => {
                   disabled={loadingCenters}
                 >
                   <option value="">
-                    {loadingCenters ? "Loading centers..." : "Select center"}
+                    {loadingCenters ? "Loading schools..." : "Select school"}
                   </option>
                   {centers.map((center) => (
                     <option key={center._id || center.name} value={center.name}>
@@ -292,7 +293,7 @@ const AddChildForm = () => {
                 {!loadingCenters && centers.length === 0 && (
                   <label className="label">
                     <span className="label-text-alt text-warning">
-                      No centers available. Please add a center first.
+                      No schools available. Please add a school first.
                     </span>
                   </label>
                 )}

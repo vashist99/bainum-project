@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import AppLayout from "../components/AppLayout";
-import { CardLoading, EmptyCenters } from "../components/LoadingStates";
+import { CardLoading, EmptySchools } from "../components/LoadingStates";
+import { schoolsFromListResponse } from "../utils/schools.js";
 import { Plus, Edit, Trash2, ChevronDown, ChevronRight, Building2, Users, Mail, MapPin, Phone, Search, Filter } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 
-const CentersPage = () => {
+const SchoolsPage = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const [centers, setCenters] = useState([]);
@@ -19,7 +20,7 @@ const CentersPage = () => {
   
   const breadcrumbs = [
     { label: "Dashboard", href: "/home" },
-    { label: "Centers", href: "/centers" }
+    { label: "Schools", href: "/schools" }
   ];
 
   // Load centers from API on component mount
@@ -27,11 +28,11 @@ const CentersPage = () => {
     const fetchCenters = async () => {
       try {
         setLoading(true);
-        const response = await axios.get("/api/centers");
-        setCenters(response.data.centers || []);
+        const response = await axios.get("/api/schools");
+        setCenters(schoolsFromListResponse(response.data));
       } catch (error) {
         console.error("Error fetching centers:", error);
-        toast.error("Failed to load centers");
+        toast.error("Failed to load schools");
         setCenters([]);
       } finally {
         setLoading(false);
@@ -59,14 +60,14 @@ const CentersPage = () => {
   }, [isAdmin]);
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this center? This will not delete the teachers, but they will need to be reassigned to another center.")) {
+    if (window.confirm("Are you sure you want to delete this school? This will not delete the teachers, but they will need to be reassigned to another school.")) {
       try {
-        await axios.delete(`/api/centers/${id}`);
+        await axios.delete(`/api/schools/${id}`);
         setCenters(centers.filter((center) => center._id !== id));
-        toast.success("Center deleted successfully");
+        toast.success("School deleted successfully");
       } catch (error) {
-        console.error("Error deleting center:", error);
-        const errorMessage = error.response?.data?.message || "Failed to delete center";
+        console.error("Error deleting school:", error);
+        const errorMessage = error.response?.data?.message || "Failed to delete school";
         toast.error(errorMessage);
       }
     }
@@ -94,7 +95,7 @@ const CentersPage = () => {
   );
   
   const handleAddCenter = () => {
-    navigate("/centers/add");
+    navigate("/schools/add");
   };
 
   const CenterCard = ({ center, index }) => {
@@ -120,7 +121,7 @@ const CentersPage = () => {
                     </span>
                   )}
                 </h3>
-                <span className="text-sm text-base-content/60">Center #{index + 1}</span>
+                <span className="text-sm text-base-content/60">School #{index + 1}</span>
               </div>
             </div>
             
@@ -134,7 +135,7 @@ const CentersPage = () => {
               <ul className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-40 border">
                 <li>
                   <button
-                    onClick={() => navigate(`/centers/edit/${center._id}`)}
+                    onClick={() => navigate(`/schools/edit/${center._id}`)}
                     className="flex items-center gap-2"
                   >
                     <Edit className="w-4 h-4" />
@@ -223,10 +224,10 @@ const CentersPage = () => {
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
               <div>
                 <h1 className="text-3xl font-bold text-base-content mb-2">
-                  Education Centers
+                  Schools
                 </h1>
                 <p className="text-base-content/70">
-                  Manage and organize your educational centers
+                  Manage and organize your schools
                 </p>
               </div>
               
@@ -239,7 +240,7 @@ const CentersPage = () => {
                     </span>
                     <input
                       type="text"
-                      placeholder="Search centers..."
+                      placeholder="Search schools..."
                       className="input input-bordered input-sm w-64"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -269,7 +270,7 @@ const CentersPage = () => {
                   className="btn btn-primary gap-2"
                 >
                   <Plus className="w-5 h-5" />
-                  Add Center
+                  Add School
                 </button>
               </div>
             </div>
@@ -281,7 +282,7 @@ const CentersPage = () => {
                   <div className="stat-figure text-primary">
                     <Building2 className="w-8 h-8" />
                   </div>
-                  <div className="stat-title">Total Centers</div>
+                  <div className="stat-title">Total Schools</div>
                   <div className="stat-value text-primary">{centers.length}</div>
                   <div className="stat-desc">Across all locations</div>
                 </div>
@@ -292,7 +293,7 @@ const CentersPage = () => {
                   </div>
                   <div className="stat-title">Total Teachers</div>
                   <div className="stat-value text-secondary">{teachers.length}</div>
-                  <div className="stat-desc">Working across centers</div>
+                  <div className="stat-desc">Working across schools</div>
                 </div>
                 
                 <div className="stat bg-base-100 shadow-lg rounded-lg">
@@ -315,7 +316,7 @@ const CentersPage = () => {
                   <Search className="w-16 h-16 mx-auto mb-4 text-base-content/30" />
                   <h3 className="text-xl font-bold text-base-content mb-2">No results found</h3>
                   <p className="text-base-content/60 mb-4">
-                    No centers match your search for "{searchTerm}"
+                    No schools match your search for "{searchTerm}"
                   </p>
                   <button 
                     onClick={() => setSearchTerm("")}
@@ -325,7 +326,7 @@ const CentersPage = () => {
                   </button>
                 </div>
               ) : (
-                <EmptyCenters onAdd={handleAddCenter} />
+                <EmptySchools onAdd={handleAddCenter} />
               )
             ) : (
               <>
@@ -408,16 +409,16 @@ const CentersPage = () => {
                                     <td>
                                       <div className="flex gap-2">
                                         <button 
-                                          onClick={() => navigate(`/centers/edit/${center._id}`)}
+                                          onClick={() => navigate(`/schools/edit/${center._id}`)}
                                           className="btn btn-ghost btn-xs"
-                                          title="Edit center"
+                                          title="Edit school"
                                         >
                                           <Edit className="w-4 h-4" />
                                         </button>
                                         <button
                                           onClick={() => handleDelete(center._id)}
                                           className="btn btn-ghost btn-xs text-error"
-                                          title="Delete center"
+                                          title="Delete school"
                                         >
                                           <Trash2 className="w-4 h-4" />
                                         </button>
@@ -470,4 +471,4 @@ const CentersPage = () => {
   );
 };
 
-export default CentersPage;
+export default SchoolsPage;

@@ -1,12 +1,12 @@
-import { Routes, Route } from 'react-router';
+import { Routes, Route, Navigate, useParams } from 'react-router';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import TeachersPage from './pages/TeachersPage';
 import AddTeacherForm from './pages/AddTeacherForm';
 import EditTeacherForm from './pages/EditTeacherForm';
-import CentersPage from './pages/CentersPage';
-import AddCenterForm from './pages/AddCenterForm';
-import EditCenterForm from './pages/EditCenterForm';
+import SchoolsPage from './pages/SchoolsPage';
+import AddSchoolForm from './pages/AddSchoolForm';
+import EditSchoolForm from './pages/EditSchoolForm';
 import AddChildForm from './pages/AddChildForm';
 import EditChildForm from './pages/EditChildForm';
 import DataPage from './pages/DataPage';
@@ -22,6 +22,11 @@ import ClassroomsPage from './pages/ClassroomsPage';
 import CreateClassroomForm from './pages/CreateClassroomForm';
 import ClassroomHomePage from './pages/ClassroomHomePage';
 import ProtectedRoute from './components/ProtectedRoute';
+
+function LegacySchoolEditRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/schools/edit/${id}`} replace />;
+}
 
 const App = () => {
   return <div data-theme="forest" className="min-h-screen">
@@ -47,25 +52,28 @@ const App = () => {
         </ProtectedRoute>
       } />
       <Route path="/classrooms/:id" element={
-        <ProtectedRoute excludeRoles={['parent']}>
+        <ProtectedRoute skipParentHomeRedirect>
           <ClassroomHomePage />
         </ProtectedRoute>
       } />
-      <Route path="/centers" element={
+      <Route path="/schools" element={
         <ProtectedRoute requiredRole="admin">
-          <CentersPage />
+          <SchoolsPage />
         </ProtectedRoute>
       } />
-      <Route path="/centers/add" element={
+      <Route path="/schools/add" element={
         <ProtectedRoute requiredRole="admin">
-          <AddCenterForm />
+          <AddSchoolForm />
         </ProtectedRoute>
       } />
-      <Route path="/centers/edit/:id" element={
+      <Route path="/schools/edit/:id" element={
         <ProtectedRoute requiredRole="admin">
-          <EditCenterForm />
+          <EditSchoolForm />
         </ProtectedRoute>
       } />
+      <Route path="/centers" element={<Navigate to="/schools" replace />} />
+      <Route path="/centers/add" element={<Navigate to="/schools/add" replace />} />
+      <Route path="/centers/edit/:id" element={<LegacySchoolEditRedirect />} />
       <Route path="/teachers" element={
         <ProtectedRoute requiredRole="admin">
           <TeachersPage />

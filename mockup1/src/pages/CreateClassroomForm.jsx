@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import AppLayout from "../components/AppLayout";
 import { School, ArrowLeft, Plus } from "lucide-react";
 import axios from "../lib/axios";
+import { schoolsFromListResponse } from "../utils/schools.js";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -29,8 +30,8 @@ const CreateClassroomForm = () => {
   // Admin: load centers for the selector.
   useEffect(() => {
     if (!isAdmin()) return;
-    axios.get("/api/centers")
-      .then((res) => setCenters(res.data.centers || []))
+    axios.get("/api/schools")
+      .then((res) => setCenters(schoolsFromListResponse(res.data)))
       .catch(() => setCenters([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -52,7 +53,7 @@ const CreateClassroomForm = () => {
       setTeachers([]);
       return;
     }
-    axios.get(`/api/centers/${encodeURIComponent(effectiveCenter)}/teachers`)
+    axios.get(`/api/schools/${encodeURIComponent(effectiveCenter)}/teachers`)
       .then((res) => setTeachers(res.data.teachers || []))
       .catch(() => setTeachers([]));
   }, [effectiveCenter]);
@@ -83,7 +84,7 @@ const CreateClassroomForm = () => {
     try {
       const payload = { name: name.trim() };
       if (isAdmin()) {
-        payload.center = selectedCenter;
+        payload.school = selectedCenter;
         payload.teacherId = selectedTeacherId;
       }
       if (assistantTeacherId) {
@@ -150,7 +151,7 @@ const CreateClassroomForm = () => {
                     <>
                       <div className="form-control w-full">
                         <label className="label py-1">
-                          <span className="label-text font-semibold">Center</span>
+                          <span className="label-text font-semibold">School</span>
                         </label>
                         <select
                           className="select select-bordered select-primary w-full"
@@ -179,7 +180,7 @@ const CreateClassroomForm = () => {
                           required
                         >
                           <option value="">
-                            {selectedCenter ? "Select a teacher..." : "Select a center first"}
+                            {selectedCenter ? "Select a teacher..." : "Select a school first"}
                           </option>
                           {teachers.map((t) => (
                             <option key={t._id} value={t._id}>{t.name}</option>
@@ -203,7 +204,7 @@ const CreateClassroomForm = () => {
                       </div>
                       <div className="form-control w-full">
                         <label className="label py-1">
-                          <span className="label-text font-semibold">Center</span>
+                          <span className="label-text font-semibold">School</span>
                         </label>
                         <input
                           type="text"
@@ -228,7 +229,7 @@ const CreateClassroomForm = () => {
                       disabled={!effectiveCenter || (isAdmin() && !selectedTeacherId)}
                     >
                       <option value="">
-                        {effectiveCenter ? "No assistant" : "Select a center first"}
+                        {effectiveCenter ? "No assistant" : "Select a school first"}
                       </option>
                       {assistantOptions.map((t) => (
                         <option key={t._id} value={t._id}>{t.name}</option>

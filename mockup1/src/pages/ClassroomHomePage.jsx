@@ -15,14 +15,13 @@ import {
   Trash2,
   Download,
   FileText,
-  X,
-  Plus,
 } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 import { buildClassroomWorkbook } from "../utils/classroomExcel";
 import TranscriptRecordCard from "../components/TranscriptRecordCard.jsx";
+import { canRemoveChildFromClassroom } from "../utils/classroomMembershipUi.js";
 
 const CATEGORIES = ["science", "social", "literature", "language"];
 
@@ -36,7 +35,7 @@ const ClassroomHomePage = () => {
   const [accessDenied, setAccessDenied] = useState(false);
   const [assessments, setAssessments] = useState([]);
   const [cohortStats, setCohortStats] = useState(null);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showAddParentsModal, setShowAddParentsModal] = useState(false);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [viewMode, setViewMode] = useState("dotmatrix"); // "dotmatrix" or "semicircular"
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -44,11 +43,10 @@ const ClassroomHomePage = () => {
   const [transcripts, setTranscripts] = useState([]);
   const [loadingTranscripts, setLoadingTranscripts] = useState(true);
   const [downloadingExcel, setDownloadingExcel] = useState(false);
-  // §7b admin add child UI state
-  const [eligibleChildren, setEligibleChildren] = useState([]);
-  const [showAddChildPicker, setShowAddChildPicker] = useState(false);
-  const [addingChildId, setAddingChildId] = useState("");
-  const [pendingChildOpId, setPendingChildOpId] = useState(null);
+  // Per-child removal: which child is the user about to remove?
+  // The confirmation modal renders iff this is non-null.
+  const [childToRemove, setChildToRemove] = useState(null);
+  const [removingChild, setRemovingChild] = useState(false);
 
   const fetchClassroom = useCallback(async () => {
     try {
@@ -90,29 +88,6 @@ const ClassroomHomePage = () => {
     }
   }, [id]);
 
-  // Same-center children that are NOT yet in this classroom. Admin-only
-  // ("Add child" affordance source).
-  const fetchEligibleChildren = useCallback(async () => {
-    if (!isAdmin() || !classroom) return;
-    try {
-      const response = await axios.get("/api/children");
-      const all = response.data.children || [];
-      const currentIds = new Set(
-        (classroom.children || []).map((c) => String(c.id ?? c._id ?? c))
-      );
-      const sameCenter = all
-        .filter(
-          (c) =>
-            String(c.center || "").trim().toLowerCase() ===
-            String(classroom.center || "").trim().toLowerCase()
-        )
-        .filter((c) => !currentIds.has(String(c._id ?? c.id)));
-      setEligibleChildren(sameCenter);
-    } catch {
-      setEligibleChildren([]);
-    }
-  }, [isAdmin, classroom]);
-
   useEffect(() => {
     setLoading(true);
     Promise.all([
@@ -122,22 +97,34 @@ const ClassroomHomePage = () => {
     ]).finally(() => setLoading(false));
   }, [fetchClassroom, fetchAssessments, fetchTranscripts]);
 
-  useEffect(() => {
-    fetchEligibleChildren();
-  }, [fetchEligibleChildren]);
-
   const refreshMembership = () => {
     fetchClassroom();
     fetchAssessments();
     fetchTranscripts();
   };
 
+  // The backend tells us how to render the page:
+  //  - role: "admin" | "lead" | "assistant" → full management UI
+  //  - role: "parent"                       → read-only variant
+  //  - role: null                           → defensive: legacy clients
+  const isParentView = classroom?.role === "parent";
+  // Show the Delete-classroom button only to admins + the classroom's
+  // lead teacher (matches DELETE /api/classrooms/:id authorization).
   const canDelete = (() => {
     if (!classroom || !user) return false;
     if (isAdmin()) return true;
     const leadId = String(classroom.teacher?.id ?? classroom.teacher ?? "");
     return user.role === "teacher" && leadId === String(user.id);
   })();
+  // Per-child Remove control: admin + classroom lead only (D7).
+  const canRemoveChildren =
+    classroom &&
+    canRemoveChildFromClassroom({
+      isAdmin: isAdmin(),
+      userRole: user?.role,
+      userId: user?.id,
+      leadTeacherId: classroom.teacher?.id ?? classroom.teacher,
+    });
 
   const handleDeleteClassroom = async () => {
     setDeleting(true);
@@ -165,48 +152,46 @@ const ClassroomHomePage = () => {
     }
   };
 
-  const handleAddChild = async () => {
-    if (!addingChildId) return;
-    setPendingChildOpId(addingChildId);
+  const handleConfirmRemoveChild = async () => {
+    if (!childToRemove) return;
+    const childId = String(childToRemove.id);
+    // Snapshot the parent that is about to be orphaned (if any) BEFORE
+    // the response refetch overwrites `classroom.parents`. The backend
+    // returns the array of pruned parent ids; we look up their names
+    // locally so the success toast can name them.
+    const beforeParents = classroom?.parents || [];
+    setRemovingChild(true);
     try {
-      await axios.patch(`/api/classrooms/${id}/children`, {
-        addChildId: addingChildId,
-      });
-      toast.success("Child enrolled in classroom");
-      setAddingChildId("");
-      setShowAddChildPicker(false);
-      refreshMembership();
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message || "Failed to enroll child."
+      const response = await axios.delete(
+        `/api/classrooms/${id}/children/${childId}`
       );
-    } finally {
-      setPendingChildOpId(null);
-    }
-  };
-
-  const handleRemoveChild = async (childId, childName) => {
-    if (
-      !window.confirm(
-        `Remove ${childName || "this child"} from ${classroom?.name || "the classroom"}? ` +
-          "Past recordings stay on the child's data page; future classroom recordings will no longer include them."
-      )
-    ) {
-      return;
-    }
-    setPendingChildOpId(childId);
-    try {
-      await axios.patch(`/api/classrooms/${id}/children`, {
-        removeChildId: childId,
-      });
-      toast.success("Child removed from classroom");
+      const { changed, removedParents = [] } = response.data || {};
+      if (!changed) {
+        toast("That child is no longer in this classroom", { icon: "ℹ️" });
+      } else {
+        if (removedParents.length > 0) {
+          const prunedNames = removedParents
+            .map((pid) => {
+              const p = beforeParents.find((x) => String(x.id) === String(pid));
+              return p?.name || "A parent";
+            })
+            .join(", ");
+          toast.success(
+            `${childToRemove.name} removed. ${prunedNames} also removed and will receive a notification.`,
+            { duration: 6000 }
+          );
+        } else {
+          toast.success(`${childToRemove.name} removed from classroom`);
+        }
+      }
+      setChildToRemove(null);
       refreshMembership();
     } catch (error) {
       toast.error(
         error.response?.data?.message || "Failed to remove child."
       );
     } finally {
-      setPendingChildOpId(null);
+      setRemovingChild(false);
     }
   };
 
@@ -317,7 +302,7 @@ const ClassroomHomePage = () => {
             </div>
             <h2 className="card-title justify-center text-2xl mb-2">Access Denied</h2>
             <p className="text-base-content/70 mb-4">
-              Only the classroom's lead teacher, assistant teacher, and admins can view this classroom.
+              Only the classroom's lead/assistant teacher, admins, and enrolled parents can view this classroom.
             </p>
             <div className="card-actions justify-center">
               <a href="/home" className="btn btn-primary">Go Home</a>
@@ -368,32 +353,34 @@ const ClassroomHomePage = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-                <button
-                  onClick={() => setShowInviteModal(true)}
-                  className="btn btn-outline btn-primary gap-2 w-full sm:w-auto"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  Invite
-                </button>
-                <button
-                  onClick={() => setShowRecordModal(true)}
-                  className="btn btn-primary gap-2 w-full sm:w-auto"
-                >
-                  <Mic className="w-4 h-4" />
-                  Record
-                </button>
-                {canDelete && (
+              {!isParentView && (
+                <div className="flex flex-col sm:flex-row gap-2 shrink-0">
                   <button
-                    onClick={() => setShowDeleteModal(true)}
-                    className="btn btn-outline btn-error gap-2 w-full sm:w-auto"
-                    title="Delete classroom"
+                    onClick={() => setShowAddParentsModal(true)}
+                    className="btn btn-outline btn-primary gap-2 w-full sm:w-auto"
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Classroom
+                    <UserPlus className="w-4 h-4" />
+                    Add Parents
                   </button>
-                )}
-              </div>
+                  <button
+                    onClick={() => setShowRecordModal(true)}
+                    className="btn btn-primary gap-2 w-full sm:w-auto"
+                  >
+                    <Mic className="w-4 h-4" />
+                    Record
+                  </button>
+                  {canDelete && (
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      className="btn btn-outline btn-error gap-2 w-full sm:w-auto"
+                      title="Delete classroom"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Classroom
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Children list: members added via parents who accepted the classroom invite */}
@@ -422,23 +409,25 @@ const ClassroomHomePage = () => {
                         >
                           <span className="font-medium truncate">{child.name}</span>
                           <div className="flex items-center gap-3 min-w-0">
-                            <span className="text-sm text-base-content/60 truncate">
-                              {parentNames.length > 0
-                                ? `Parent${parentNames.length === 1 ? "" : "s"}: ${parentNames.join(", ")}`
-                                : "No classroom parent linked"}
-                            </span>
-                            {isAdmin() && (
+                            {/* Parent attribution is admin/teacher-only; the
+                                parent variant never sees the full roster. */}
+                            {!isParentView && (
+                              <span className="text-sm text-base-content/60 truncate">
+                                {parentNames.length > 0
+                                  ? `Parent${parentNames.length === 1 ? "" : "s"}: ${parentNames.join(", ")}`
+                                  : "No classroom parent linked"}
+                              </span>
+                            )}
+                            {canRemoveChildren && (
                               <button
-                                onClick={() => handleRemoveChild(childId, child.name)}
-                                disabled={pendingChildOpId === childId}
+                                onClick={() =>
+                                  setChildToRemove({ id: childId, name: child.name })
+                                }
                                 className="btn btn-xs btn-ghost text-error gap-1 shrink-0"
                                 title="Remove from classroom"
+                                aria-label={`Remove ${child.name} from classroom`}
                               >
-                                {pendingChildOpId === childId ? (
-                                  <span className="loading loading-spinner loading-xs" />
-                                ) : (
-                                  <X className="w-3.5 h-3.5" />
-                                )}
+                                <Trash2 className="w-3.5 h-3.5" />
                                 Remove
                               </button>
                             )}
@@ -450,74 +439,18 @@ const ClassroomHomePage = () => {
                 ) : (
                   <div className="text-center py-6">
                     <p className="text-sm text-base-content/60 mb-3">
-                      No children yet — invite parents who accepted their invitation
-                      to add their children to this classroom.
+                      {isParentView
+                        ? "You don't have any children enrolled in this classroom yet."
+                        : "No children yet — add parents who accepted their invitation to enroll their children in this classroom."}
                     </p>
-                    <button
-                      onClick={() => setShowInviteModal(true)}
-                      className="btn btn-primary btn-sm gap-2"
-                    >
-                      <UserPlus className="w-4 h-4" />
-                      Invite Parents
-                    </button>
-                  </div>
-                )}
-
-                {isAdmin() && (
-                  <div className="mt-3 pt-3 border-t border-base-200">
-                    {!showAddChildPicker ? (
+                    {!isParentView && (
                       <button
-                        onClick={() => setShowAddChildPicker(true)}
-                        className="btn btn-sm btn-outline btn-primary gap-2"
-                        disabled={eligibleChildren.length === 0}
-                        title={
-                          eligibleChildren.length === 0
-                            ? `No other children at ${classroom.center} available to enroll.`
-                            : "Manually enroll a child in this classroom"
-                        }
+                        onClick={() => setShowAddParentsModal(true)}
+                        className="btn btn-primary btn-sm gap-2"
                       >
-                        <Plus className="w-4 h-4" />
-                        Add child to classroom
+                        <UserPlus className="w-4 h-4" />
+                        Add Parents
                       </button>
-                    ) : (
-                      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-                        <select
-                          value={addingChildId}
-                          onChange={(e) => setAddingChildId(e.target.value)}
-                          className="select select-bordered select-sm flex-1 min-w-0"
-                        >
-                          <option value="">
-                            Select a child from {classroom.center}…
-                          </option>
-                          {eligibleChildren.map((c) => (
-                            <option key={c._id || c.id} value={c._id || c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleAddChild}
-                            disabled={!addingChildId || !!pendingChildOpId}
-                            className="btn btn-sm btn-primary"
-                          >
-                            {pendingChildOpId ? (
-                              <span className="loading loading-spinner loading-xs" />
-                            ) : (
-                              "Add"
-                            )}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowAddChildPicker(false);
-                              setAddingChildId("");
-                            }}
-                            className="btn btn-sm btn-ghost"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
                     )}
                   </div>
                 )}
@@ -558,26 +491,34 @@ const ClassroomHomePage = () => {
                   </div>
                   <h3 className="card-title">No recordings yet</h3>
                   <p className="text-base-content/70 max-w-md">
-                    {classroom.children?.length > 0
+                    {isParentView
+                      ? "No recordings have been made for your children in this classroom yet."
+                      : classroom.children?.length > 0
                       ? "Record a classroom session to see aggregated language development data for every child in this classroom."
-                      : "Invite parents to add their children to this classroom, then record a session to see aggregated data."}
+                      : "Add parents to enroll their children in this classroom, then record a session to see aggregated data."}
                   </p>
-                  <button
-                    onClick={() => (classroom.children?.length > 0 ? setShowRecordModal(true) : setShowInviteModal(true))}
-                    className="btn btn-primary gap-2 mt-3"
-                  >
-                    {classroom.children?.length > 0 ? (
-                      <>
-                        <Mic className="w-4 h-4" />
-                        Record Session
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-4 h-4" />
-                        Invite Parents
-                      </>
-                    )}
-                  </button>
+                  {!isParentView && (
+                    <button
+                      onClick={() =>
+                        classroom.children?.length > 0
+                          ? setShowRecordModal(true)
+                          : setShowAddParentsModal(true)
+                      }
+                      className="btn btn-primary gap-2 mt-3"
+                    >
+                      {classroom.children?.length > 0 ? (
+                        <>
+                          <Mic className="w-4 h-4" />
+                          Record Session
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4" />
+                          Add Parents
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -664,12 +605,78 @@ const ClassroomHomePage = () => {
           </div>
 
       {/* Modals */}
-      {showInviteModal && (
+      {showAddParentsModal && (
         <ClassroomInviteModal
           classroomId={id}
           onInvited={refreshMembership}
-          onClose={() => setShowInviteModal(false)}
+          onClose={() => setShowAddParentsModal(false)}
         />
+      )}
+
+      {childToRemove && (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-lg">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="bg-error/10 p-2 rounded-lg shrink-0">
+                <Trash2 className="w-5 h-5 text-error" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">
+                  Remove {childToRemove.name} from this classroom?
+                </h3>
+                <p className="text-sm text-base-content/70 mt-1">
+                  {childToRemove.name} will be removed from{" "}
+                  <span className="font-semibold">{classroom.name}</span>.
+                </p>
+              </div>
+            </div>
+
+            <ul className="list-disc list-inside text-sm text-base-content/80 space-y-1 mb-4 pl-1">
+              <li>
+                Past recordings stay on the child's data page; classroom
+                aggregates and transcripts no longer include them.
+              </li>
+              <li>
+                If the parent has no other children in this classroom, they
+                are also removed and will receive a notification.
+              </li>
+              <li>
+                The parent and child accounts themselves are not deleted.
+              </li>
+              <li>
+                Historical assessments retain their classroom attribution
+                for reporting.
+              </li>
+            </ul>
+
+            <div className="modal-action mt-2">
+              <button
+                onClick={() => setChildToRemove(null)}
+                disabled={removingChild}
+                className="btn btn-ghost"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRemoveChild}
+                disabled={removingChild}
+                className="btn btn-error gap-2"
+              >
+                {removingChild ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Yes, remove
+              </button>
+            </div>
+          </div>
+          <button
+            className="modal-backdrop"
+            aria-label="Close"
+            onClick={() => !removingChild && setChildToRemove(null)}
+          />
+        </div>
       )}
 
       {showRecordModal && (

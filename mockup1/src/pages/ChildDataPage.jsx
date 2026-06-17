@@ -587,7 +587,7 @@ const ChildDataPage = () => {
                     </span>
                   )}
                 </div>
-                <div className="stat-desc">Center: {child.center || "—"}</div>
+                <div className="stat-desc">School: {child.center || "—"}</div>
               </div>
             </div>
           </div>

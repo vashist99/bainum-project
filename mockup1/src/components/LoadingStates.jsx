@@ -142,12 +142,12 @@ export const EmptyTeachers = ({ onAdd }) => (
   />
 );
 
-export const EmptyCenters = ({ onAdd }) => (
+export const EmptySchools = ({ onAdd }) => (
   <EmptyState
     icon={Building2}
-    title="No Centers Registered"
-    description="Create your first educational center to start organizing teachers and students."
-    actionLabel="Add Center"
+    title="No Schools Registered"
+    description="Create your first school to start organizing teachers and students."
+    actionLabel="Add School"
     onAction={onAdd}
   />
 );

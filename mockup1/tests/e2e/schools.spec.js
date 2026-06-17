@@ -1,8 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Centers Page', () => {
+test.describe('Schools Page', () => {
   test.beforeEach(async ({ page }) => {
-    // Login as admin before each test
     const testEmail = process.env.TEST_ADMIN_EMAIL || 'admin@example.com';
     const testPassword = process.env.TEST_ADMIN_PASSWORD || 'password123';
     
@@ -13,73 +12,70 @@ test.describe('Centers Page', () => {
     await page.waitForURL(/\/home|\/data/, { timeout: 10000 });
   });
 
-  test('should navigate to centers page', async ({ page }) => {
-    await page.goto('/centers');
+  test('should navigate to schools page', async ({ page }) => {
+    await page.goto('/schools');
     await page.waitForTimeout(2000);
     
-    // Should be on centers page
     const url = page.url();
-    expect(url).toContain('/centers');
+    expect(url).toContain('/schools');
     
-    // Check for centers page content
     const heading = page.locator('h1, h2').first();
-    await expect(heading).toContainText(/centers/i);
+    await expect(heading).toContainText(/schools/i);
   });
 
-  test('should show centers list', async ({ page }) => {
+  test('legacy /centers redirects to /schools', async ({ page }) => {
     await page.goto('/centers');
+    await page.waitForURL(/\/schools/, { timeout: 10000 });
+    expect(page.url()).toContain('/schools');
+  });
+
+  test('should show schools list', async ({ page }) => {
+    await page.goto('/schools');
     await page.waitForTimeout(2000);
     
-    // Check if table or list exists
     const table = page.locator('table').first();
     const tableExists = await table.isVisible().catch(() => false);
     
     if (tableExists) {
-      // Table should be visible
       await expect(table).toBeVisible();
     } else {
-      // Or check for "No centers" message
-      const noCentersMessage = page.locator('text=/no centers|no centers added/i');
-      const hasMessage = await noCentersMessage.isVisible().catch(() => false);
+      const noSchoolsMessage = page.locator('text=/no schools|no schools registered/i');
+      const hasMessage = await noSchoolsMessage.isVisible().catch(() => false);
       expect(hasMessage || tableExists).toBeTruthy();
     }
   });
 
-  test('should navigate to add center form', async ({ page }) => {
-    await page.goto('/centers');
+  test('should navigate to add school form', async ({ page }) => {
+    await page.goto('/schools');
     await page.waitForTimeout(2000);
     
-    // Look for "Add Center" button
-    const addButton = page.locator('button:has-text("Add Center"), a:has-text("Add Center")').first();
+    const addButton = page.locator('button:has-text("Add School"), a:has-text("Add School")').first();
     const buttonExists = await addButton.isVisible().catch(() => false);
     
     if (buttonExists) {
       await addButton.click();
       await page.waitForTimeout(1000);
       
-      // Should navigate to add center page
       const url = page.url();
-      expect(url).toContain('/centers/add');
+      expect(url).toContain('/schools/add');
       
-      // Check for form elements
-      const nameInput = page.locator('input[name="name"], input[placeholder*="center name" i]').first();
+      const nameInput = page.locator('input[name="name"], input[placeholder*="school name" i]').first();
       const nameInputExists = await nameInput.isVisible().catch(() => false);
       expect(nameInputExists).toBeTruthy();
     }
   });
 
-  test('should have centers link in navbar', async ({ page }) => {
+  test('should have schools link in navbar', async ({ page }) => {
     await page.goto('/home');
     await page.waitForTimeout(1000);
     
-    // Check for Centers link in navbar
-    const centersLink = page.locator('a[href="/centers"], a:has-text("Centers")').first();
-    const linkExists = await centersLink.isVisible().catch(() => false);
+    const schoolsLink = page.locator('a[href="/schools"], a:has-text("Schools")').first();
+    const linkExists = await schoolsLink.isVisible().catch(() => false);
     
     if (linkExists) {
-      await centersLink.click();
+      await schoolsLink.click();
       await page.waitForTimeout(1000);
-      expect(page.url()).toContain('/centers');
+      expect(page.url()).toContain('/schools');
     }
   });
 });

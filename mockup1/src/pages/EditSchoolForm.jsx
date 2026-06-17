@@ -4,12 +4,13 @@ import AppLayout from "../components/AppLayout";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
 import axios from "../lib/axios";
+import { schoolFromEntityResponse } from "../utils/schools.js";
 
-const EditCenterForm = () => {
+const EditSchoolForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [loading, setLoading] = useState(false);
-  const [loadingCenter, setLoadingCenter] = useState(true);
+  const [loadingSchool, setLoadingSchool] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -18,34 +19,33 @@ const EditCenterForm = () => {
     description: "",
   });
 
-  // Load center data
   useEffect(() => {
-    const fetchCenter = async () => {
+    const fetchSchool = async () => {
       try {
-        setLoadingCenter(true);
-        const response = await axios.get(`/api/centers/${id}`);
-        const center = response.data.center;
+        setLoadingSchool(true);
+        const response = await axios.get(`/api/schools/${id}`);
+        const school = schoolFromEntityResponse(response.data);
         
-        if (center) {
+        if (school) {
           setFormData({
-            name: center.name || "",
-            address: center.address || "",
-            phone: center.phone || "",
-            email: center.email || "",
-            description: center.description || "",
+            name: school.name || "",
+            address: school.address || "",
+            phone: school.phone || "",
+            email: school.email || "",
+            description: school.description || "",
           });
         }
       } catch (error) {
-        console.error("Error fetching center:", error);
-        toast.error("Failed to load center data");
-        navigate("/centers");
+        console.error("Error fetching school:", error);
+        toast.error("Failed to load school data");
+        navigate("/schools");
       } finally {
-        setLoadingCenter(false);
+        setLoadingSchool(false);
       }
     };
 
     if (id) {
-      fetchCenter();
+      fetchSchool();
     }
   }, [id, navigate]);
 
@@ -58,11 +58,10 @@ const EditCenterForm = () => {
 
   const validateForm = () => {
     if (!formData.name) {
-      toast.error("Center name is required");
+      toast.error("School name is required");
       return false;
     }
 
-    // Basic email validation if provided
     if (formData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
@@ -82,24 +81,22 @@ const EditCenterForm = () => {
     setLoading(true);
 
     try {
-      // Make API call to update center
-      await axios.put(`/api/centers/${id}`, formData);
+      await axios.put(`/api/schools/${id}`, formData);
 
-      toast.success("Center updated successfully!");
+      toast.success("School updated successfully!");
 
-      // Navigate to centers page
-      navigate("/centers");
+      navigate("/schools");
     } catch (error) {
       const errorMessage =
-        error.response?.data?.message || "Failed to update center. Please try again.";
+        error.response?.data?.message || "Failed to update school. Please try again.";
       toast.error(errorMessage);
-      console.error("Error updating center:", error);
+      console.error("Error updating school:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loadingCenter) {
+  if (loadingSchool) {
     return (
       <AppLayout>
         <div className="container mx-auto p-6 max-w-2xl">
@@ -116,28 +113,27 @@ const EditCenterForm = () => {
       <div className="container mx-auto p-6 max-w-2xl">
         <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => navigate("/centers")}
+            onClick={() => navigate("/schools")}
             className="btn btn-ghost btn-circle"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Edit Center
+            Edit School
           </h1>
         </div>
 
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Center Name */}
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text font-semibold">Center Name *</span>
+                  <span className="label-text font-semibold">School Name *</span>
                 </label>
                 <input
                   type="text"
                   name="name"
-                  placeholder="Enter center name"
+                  placeholder="Enter school name"
                   className="input input-bordered input-primary w-full"
                   value={formData.name}
                   onChange={handleInputChange}
@@ -145,7 +141,6 @@ const EditCenterForm = () => {
                 />
               </div>
 
-              {/* Address */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">Address</span>
@@ -153,14 +148,13 @@ const EditCenterForm = () => {
                 <input
                   type="text"
                   name="address"
-                  placeholder="Enter center address"
+                  placeholder="Enter school address"
                   className="input input-bordered input-primary w-full"
                   value={formData.address}
                   onChange={handleInputChange}
                 />
               </div>
 
-              {/* Phone */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">Phone</span>
@@ -175,7 +169,6 @@ const EditCenterForm = () => {
                 />
               </div>
 
-              {/* Email */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">Email</span>
@@ -183,21 +176,20 @@ const EditCenterForm = () => {
                 <input
                   type="email"
                   name="email"
-                  placeholder="center@email.com"
+                  placeholder="school@email.com"
                   className="input input-bordered input-primary w-full"
                   value={formData.email}
                   onChange={handleInputChange}
                 />
               </div>
 
-              {/* Description */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-semibold">Description</span>
                 </label>
                 <textarea
                   name="description"
-                  placeholder="Enter center description (optional)"
+                  placeholder="Enter school description (optional)"
                   className="textarea textarea-bordered textarea-primary w-full"
                   value={formData.description}
                   onChange={handleInputChange}
@@ -205,7 +197,6 @@ const EditCenterForm = () => {
                 />
               </div>
 
-              {/* Submit Button */}
               <div className="form-control mt-6">
                 <button 
                   type="submit" 
@@ -215,10 +206,10 @@ const EditCenterForm = () => {
                   {loading ? (
                     <>
                       <span className="loading loading-spinner"></span>
-                      Updating Center...
+                      Updating School...
                     </>
                   ) : (
-                    "Update Center"
+                    "Update School"
                   )}
                 </button>
               </div>
@@ -230,4 +221,4 @@ const EditCenterForm = () => {
   );
 };
 
-export default EditCenterForm;
+export default EditSchoolForm;

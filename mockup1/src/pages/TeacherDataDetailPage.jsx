@@ -232,7 +232,7 @@ const TeacherDataDetailPage = () => {
                 <div className="stat-figure text-accent">
                   <Building2 className="w-8 h-8" />
                 </div>
-                <div className="stat-title">Center</div>
+                <div className="stat-title">School</div>
                 <div className="stat-value text-2xl">{teacher.center}</div>
               </div>
             </div>
