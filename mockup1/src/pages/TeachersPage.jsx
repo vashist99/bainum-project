@@ -6,6 +6,9 @@ import { Plus, Edit, Trash2, ChevronDown, ChevronRight, User, Users, Mail, Build
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
+import ViewModeToggle from "../components/ViewModeToggle.jsx";
+import useViewMode, { VIEW_MODE_TILES } from "../hooks/useViewMode.js";
+import useSortableList from "../hooks/useSortableList.js";
 
 const TeachersPage = () => {
   const navigate = useNavigate();
@@ -21,12 +24,10 @@ const TeachersPage = () => {
   const [selectedTeacherForInvite, setSelectedTeacherForInvite] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [sendingInvite, setSendingInvite] = useState(false);
-  const [sortByCenter, setSortByCenter] = useState(null); // null | 'asc' | 'desc'
-  const [sortByLanguage, setSortByLanguage] = useState(null); // null | 'asc' | 'desc'
   /** Lowercased emails that already have a teacher invitation sent */
   const [invitedTeacherEmails, setInvitedTeacherEmails] = useState(() => new Set());
   const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState("cards");
+  const [viewMode, setViewMode] = useViewMode("teachers");
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/home" },
@@ -107,77 +108,13 @@ const TeachersPage = () => {
     fetchCenters();
   }, [isAdmin]);
 
-  const filteredTeachers = (() => {
-    let list = selectedCenter
-      ? teachers.filter((t) => t.center === selectedCenter)
-      : teachers;
-    
-    // Apply search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      list = list.filter((t) => 
-        t.name?.toLowerCase().includes(term) ||
-        t.email?.toLowerCase().includes(term) ||
-        t.center?.toLowerCase().includes(term) ||
-        t.education?.toLowerCase().includes(term)
-      );
-    }
-    if (sortByCenter) {
-      list = [...list].sort((a, b) => {
-        const ca = (a.center || '').toLowerCase();
-        const cb = (b.center || '').toLowerCase();
-        const cmp = ca.localeCompare(cb);
-        return sortByCenter === 'asc' ? cmp : -cmp;
-      });
-    }
-    if (sortByLanguage) {
-      list = [...list].sort((a, b) => {
-        const la = getPrimaryLanguageForTeacher(a).toLowerCase();
-        const lb = getPrimaryLanguageForTeacher(b).toLowerCase();
-        const cmp = la.localeCompare(lb);
-        return sortByLanguage === 'asc' ? cmp : -cmp;
-      });
-    }
-    return list;
-  })();
-
-  const handleSortByCenter = () => {
-    setSortByLanguage(null);
-    setSortByCenter(sortByCenter === 'asc' ? 'desc' : sortByCenter === 'desc' ? null : 'asc');
-  };
-
-  const handleSortByLanguage = () => {
-    setSortByCenter(null);
-    setSortByLanguage(sortByLanguage === 'asc' ? 'desc' : sortByLanguage === 'desc' ? null : 'asc');
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this teacher?")) {
-      try {
-        await axios.delete(`/api/teachers/${id}`);
-        setTeachers(teachers.filter((teacher) => teacher._id !== id));
-        toast.success("Teacher deleted successfully");
-      } catch (error) {
-        console.error("Error deleting teacher:", error);
-        toast.error("Failed to delete teacher");
-      }
-    }
-  };
-
-  const toggleTeacherExpansion = (teacherId) => {
-    const newExpanded = new Set(expandedTeachers);
-    if (newExpanded.has(teacherId)) {
-      newExpanded.delete(teacherId);
-    } else {
-      newExpanded.add(teacherId);
-    }
-    setExpandedTeachers(newExpanded);
-  };
-
   /**
    * Children supervised by the given teacher object (id-matched against any
    * classroom where they are the lead or assistant). Replaces the prior
    * leadTeacher-name string match.
+   *
+   * Defined above `filteredTeachers` so the sortable-list getter for the
+   * "students" column can reference it without a temporal dead-zone error.
    */
   const getChildrenForTeacher = (teacher) => {
     if (!isAdmin()) return [];
@@ -187,8 +124,6 @@ const TeachersPage = () => {
         ? null
         : String(teacher._id ?? teacher.id ?? "");
     if (!teacherId) return [];
-    // Set of child ObjectId strings enrolled in any classroom this teacher
-    // leads or assists.
     const childIdSet = new Set();
     for (const room of classrooms || []) {
       const leadId = String(room?.teacher?._id ?? room?.teacher ?? "");
@@ -212,6 +147,84 @@ const TeachersPage = () => {
       langCounts[lang] = (langCounts[lang] || 0) + 1;
     });
     return Object.entries(langCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  };
+
+  // Apply center + search filters *before* sort, so the toggle and sort
+  // operate on the same filtered set in either rendering mode.
+  const filteredBase = (() => {
+    let list = selectedCenter
+      ? teachers.filter((t) => t.center === selectedCenter)
+      : teachers;
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter((t) =>
+        t.name?.toLowerCase().includes(term) ||
+        t.email?.toLowerCase().includes(term) ||
+        t.center?.toLowerCase().includes(term) ||
+        t.education?.toLowerCase().includes(term)
+      );
+    }
+    return list;
+  })();
+
+  // Sortable column descriptors. Keys persist into `data-sort:teachers`
+  // and have to stay stable across releases (design.md D5). Date of
+  // birth uses an explicit numeric getter so date-string ordering is
+  // chronological, not lexicographical.
+  const teachersColumns = [
+    { key: "name", label: "Name", getter: (t) => t?.name },
+    { key: "email", label: "Email", getter: (t) => t?.email },
+    { key: "education", label: "Education", getter: (t) => t?.education },
+    {
+      key: "dob",
+      label: "Date of Birth",
+      getter: (t) => (t?.dateOfBirth ? new Date(t.dateOfBirth).getTime() : null),
+    },
+    { key: "center", label: "Center", getter: (t) => t?.center },
+    { key: "language", label: "Language", getter: (t) => getPrimaryLanguageForTeacher(t) },
+    { key: "students", label: "Students", getter: (t) => getChildrenForTeacher(t).length },
+  ];
+
+  const {
+    sortedItems: filteredTeachers,
+    activeSort: teachersSort,
+    cycleSort: cycleTeachersSort,
+    ariaSortFor: teachersAriaSortFor,
+  } = useSortableList(filteredBase, "teachers", teachersColumns);
+
+  const renderSortIcon = (columnKey, activeSort) => {
+    if (!activeSort || activeSort.column !== columnKey) {
+      return <ArrowUpDown className="w-3 h-3 opacity-50" aria-hidden="true" />;
+    }
+    return activeSort.direction === "asc" ? (
+      <ArrowUp className="w-3 h-3" aria-hidden="true" />
+    ) : (
+      <ArrowDown className="w-3 h-3" aria-hidden="true" />
+    );
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this teacher?")) {
+      try {
+        await axios.delete(`/api/teachers/${id}`);
+        setTeachers(teachers.filter((teacher) => teacher._id !== id));
+        toast.success("Teacher deleted successfully");
+      } catch (error) {
+        console.error("Error deleting teacher:", error);
+        toast.error("Failed to delete teacher");
+      }
+    }
+  };
+
+  const toggleTeacherExpansion = (teacherId) => {
+    const newExpanded = new Set(expandedTeachers);
+    if (newExpanded.has(teacherId)) {
+      newExpanded.delete(teacherId);
+    } else {
+      newExpanded.add(teacherId);
+    }
+    setExpandedTeachers(newExpanded);
   };
 
   const openInviteModal = (teacher) => {
@@ -541,21 +554,14 @@ const TeachersPage = () => {
                   </div>
                 </div>
                 
-                {/* View Toggle */}
-                <div className="btn-group">
-                  <button 
-                    className={`btn btn-sm ${viewMode === 'cards' ? 'btn-primary' : 'btn-ghost'}`}
-                    onClick={() => setViewMode('cards')}
-                  >
-                    Cards
-                  </button>
-                  <button 
-                    className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-ghost'}`}
-                    onClick={() => setViewMode('table')}
-                  >
-                    Table
-                  </button>
-                </div>
+                {/* View Toggle — shared component, persists choice into
+                    `data-view-mode:teachers` so the preference survives
+                    reloads. */}
+                <ViewModeToggle
+                  value={viewMode}
+                  onChange={setViewMode}
+                  ariaLabel="Teachers list view mode"
+                />
                 
                 {/* Add Button */}
                 <button
@@ -706,17 +712,17 @@ const TeachersPage = () => {
               )
             ) : (
               <>
-                {/* Cards View */}
-                {viewMode === "cards" && (
+                {/* Tile View (formerly "Cards") */}
+                {viewMode === VIEW_MODE_TILES && (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {filteredTeachers.map((teacher, index) => (
                       <TeacherCard key={teacher._id} teacher={teacher} index={index} />
                     ))}
                   </div>
                 )}
-                
+
                 {/* Table View */}
-                {viewMode === "table" && (
+                {viewMode !== VIEW_MODE_TILES && (
                   <div className="card bg-base-100 shadow-xl">
                     <div className="card-body p-0">
                       <div className="overflow-x-auto">
@@ -725,32 +731,64 @@ const TeachersPage = () => {
                             <tr>
                               {isAdmin() && <th className="w-12"></th>}
                               <th>#</th>
-                              <th>Name</th>
-                              <th>Email</th>
-                              <th>Education</th>
-                              <th>Date of Birth</th>
-                              <th>
+                              <th aria-sort={teachersAriaSortFor("name")}>
                                 <button
                                   type="button"
-                                  onClick={handleSortByCenter}
+                                  onClick={() => cycleTeachersSort("name")}
+                                  className="flex items-center gap-1 hover:underline"
+                                >
+                                  Name
+                                  {renderSortIcon("name", teachersSort)}
+                                </button>
+                              </th>
+                              <th aria-sort={teachersAriaSortFor("email")}>
+                                <button
+                                  type="button"
+                                  onClick={() => cycleTeachersSort("email")}
+                                  className="flex items-center gap-1 hover:underline"
+                                >
+                                  Email
+                                  {renderSortIcon("email", teachersSort)}
+                                </button>
+                              </th>
+                              <th aria-sort={teachersAriaSortFor("education")}>
+                                <button
+                                  type="button"
+                                  onClick={() => cycleTeachersSort("education")}
+                                  className="flex items-center gap-1 hover:underline"
+                                >
+                                  Education
+                                  {renderSortIcon("education", teachersSort)}
+                                </button>
+                              </th>
+                              <th aria-sort={teachersAriaSortFor("dob")}>
+                                <button
+                                  type="button"
+                                  onClick={() => cycleTeachersSort("dob")}
+                                  className="flex items-center gap-1 hover:underline"
+                                >
+                                  Date of Birth
+                                  {renderSortIcon("dob", teachersSort)}
+                                </button>
+                              </th>
+                              <th aria-sort={teachersAriaSortFor("center")}>
+                                <button
+                                  type="button"
+                                  onClick={() => cycleTeachersSort("center")}
                                   className="flex items-center gap-1 hover:underline"
                                 >
                                   Center
-                                  {sortByCenter === 'asc' && <ArrowUp className="w-3 h-3" />}
-                                  {sortByCenter === 'desc' && <ArrowDown className="w-3 h-3" />}
-                                  {!sortByCenter && <ArrowUpDown className="w-3 h-3 opacity-50" />}
+                                  {renderSortIcon("center", teachersSort)}
                                 </button>
                               </th>
-                              <th>
+                              <th aria-sort={teachersAriaSortFor("language")}>
                                 <button
                                   type="button"
-                                  onClick={handleSortByLanguage}
+                                  onClick={() => cycleTeachersSort("language")}
                                   className="flex items-center gap-1 hover:underline"
                                 >
                                   Language
-                                  {sortByLanguage === 'asc' && <ArrowUp className="w-3 h-3" />}
-                                  {sortByLanguage === 'desc' && <ArrowDown className="w-3 h-3" />}
-                                  {!sortByLanguage && <ArrowUpDown className="w-3 h-3 opacity-50" />}
+                                  {renderSortIcon("language", teachersSort)}
                                 </button>
                               </th>
                               <th>Actions</th>

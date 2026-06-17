@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import AppLayout from "../components/AppLayout";
-import { Users, ChevronRight, UserPlus, Mail, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown, CheckSquare } from "lucide-react";
+import { Users, ChevronRight, UserPlus, Mail, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown, CheckSquare, User } from "lucide-react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 import { getPrimaryChildId } from "../utils/parentChildren.js";
+import ViewModeToggle from "../components/ViewModeToggle.jsx";
+import useViewMode, { VIEW_MODE_TILES } from "../hooks/useViewMode.js";
+import useSortableList from "../hooks/useSortableList.js";
 
 const DataPage = () => {
   const navigate = useNavigate();
@@ -40,10 +43,9 @@ const DataPage = () => {
   const [sendingInvite, setSendingInvite] = useState(false);
   /** Child ids selected in the table for bulk invite (checkboxes) */
   const [selectedChildIdsForBulk, setSelectedChildIdsForBulk] = useState(() => new Set());
-  const [sortBy, setSortBy] = useState(null); // 'age' | 'teacher' | 'language'
-  const [sortAsc, setSortAsc] = useState(true);
   /** Child ids that already have a parent invitation sent (any status) */
   const [invitedChildIds, setInvitedChildIds] = useState(() => new Set());
+  const [childrenViewMode, setChildrenViewMode] = useViewMode("children");
 
   useEffect(() => {
     if (!isAdmin() && !isTeacher()) return;
@@ -289,35 +291,34 @@ const DataPage = () => {
     return rem === 0 ? `${years} yrs` : `${years} yrs ${rem} mo`;
   };
 
-  const handleSort = (column) => {
-    if (sortBy === column) {
-      setSortAsc(!sortAsc);
-    } else {
-      setSortBy(column);
-      setSortAsc(true);
-    }
-  };
+  // Sortable column descriptors. Keys are persisted into
+  // `data-sort:children` and have to stay stable across releases — see
+  // design.md D5. `actions`/`avatar`/`select` are omitted because they
+  // aren't sortable.
+  const childrenColumns = [
+    { key: "name", label: "Name", getter: (c) => c?.name },
+    { key: "age", label: "Age", getter: (c) => getAgeInMonths(c?.dateOfBirth) },
+    { key: "language", label: "Language", getter: (c) => c?.primaryLanguage },
+    { key: "center", label: "Center", getter: (c) => c?.center },
+  ];
 
-  const sortedChildren = (() => {
-    if (!sortBy) return filteredChildren;
-    return [...filteredChildren].sort((a, b) => {
-      let cmp = 0;
-      if (sortBy === 'age') {
-        const ma = getAgeInMonths(a.dateOfBirth);
-        const mb = getAgeInMonths(b.dateOfBirth);
-        cmp = ma - mb;
-      } else if (sortBy === 'center') {
-        const ta = (a.center || '').toLowerCase();
-        const tb = (b.center || '').toLowerCase();
-        cmp = ta.localeCompare(tb);
-      } else if (sortBy === 'language') {
-        const la = (a.primaryLanguage || '').toLowerCase();
-        const lb = (b.primaryLanguage || '').toLowerCase();
-        cmp = la.localeCompare(lb);
-      }
-      return sortAsc ? cmp : -cmp;
-    });
-  })();
+  const {
+    sortedItems: sortedChildren,
+    activeSort: childrenSort,
+    cycleSort: cycleChildrenSort,
+    ariaSortFor: childrenAriaSortFor,
+  } = useSortableList(filteredChildren, "children", childrenColumns);
+
+  const renderSortIcon = (columnKey, activeSort) => {
+    if (!activeSort || activeSort.column !== columnKey) {
+      return <ArrowUpDown className="w-3 h-3 opacity-50" aria-hidden="true" />;
+    }
+    return activeSort.direction === "asc" ? (
+      <ArrowUp className="w-3 h-3" aria-hidden="true" />
+    ) : (
+      <ArrowDown className="w-3 h-3" aria-hidden="true" />
+    );
+  };
 
   const bulkEligibleChildren = sortedChildren.filter(isChildEligibleForInvite);
   const allBulkEligibleSelected =
@@ -483,7 +484,9 @@ const DataPage = () => {
           );
         })()}
 
-        {/* Children Table - Show for selected teacher or all children for admins */}
+        {/* Children list - shows for selected teacher or all children for admins.
+            Outer card is shared; inner body switches between Tile and Table
+            renderers via `childrenViewMode`. */}
         {(selectedTeacher || (isAdmin() && children.length > 0)) && (
           <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
@@ -491,185 +494,220 @@ const DataPage = () => {
                 <h2 className="card-title">
                   {selectedTeacher ? `Children at ${selectedTeacher}` : "All Children"}
                 </h2>
-                {bulkEligibleChildren.length > 0 && (
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm gap-2 shrink-0"
-                    onClick={openBulkInviteFromSelection}
-                    disabled={selectedChildIdsForBulk.size === 0}
-                    title={
-                      selectedChildIdsForBulk.size === 0
-                        ? "Select one or more children using the checkboxes"
-                        : "Send one parent invitation email covering all selected children"
-                    }
-                  >
-                    <Mail className="w-4 h-4" />
-                    Invite parent for selected
-                    {selectedChildIdsForBulk.size > 0 ? ` (${selectedChildIdsForBulk.size})` : ""}
-                  </button>
-                )}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <ViewModeToggle
+                    value={childrenViewMode}
+                    onChange={setChildrenViewMode}
+                    ariaLabel="Children list view mode"
+                  />
+                  {bulkEligibleChildren.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm gap-2"
+                      onClick={openBulkInviteFromSelection}
+                      disabled={selectedChildIdsForBulk.size === 0}
+                      title={
+                        selectedChildIdsForBulk.size === 0
+                          ? "Select one or more children using the checkboxes"
+                          : "Send one parent invitation email covering all selected children"
+                      }
+                    >
+                      <Mail className="w-4 h-4" />
+                      Invite parent for selected
+                      {selectedChildIdsForBulk.size > 0 ? ` (${selectedChildIdsForBulk.size})` : ""}
+                    </button>
+                  )}
+                </div>
               </div>
-              {/* Mobile: Card layout */}
-              <div className="block md:hidden space-y-3">
-                {filteredChildren.length === 0 ? (
-                  <p className="text-center text-base-content/60 py-8">
-                    No children found.
-                  </p>
-                ) : (
-                  sortedChildren.map((child, index) => (
+
+              {filteredChildren.length === 0 ? (
+                <p className="text-center text-base-content/60 py-8">
+                  No children found.
+                </p>
+              ) : childrenViewMode === VIEW_MODE_TILES ? (
+                /* Tile mode — responsive grid of cards. 1 col mobile,
+                   2 cols md, 3 cols xl. Each tile mirrors the existing
+                   teacher-card visual language (avatar circle, name link,
+                   meta badges, action footer). */
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {sortedChildren.map((child, index) => (
                     <div
                       key={child._id || child.id}
-                      className="card bg-base-200 border border-base-300 overflow-hidden"
+                      className="card bg-base-200 border border-base-300 hover:shadow-lg transition-shadow"
                     >
                       <div className="card-body p-4">
-                        <div className="flex justify-between items-start gap-2">
+                        <div className="flex items-start gap-3">
                           <label
-                            className={`flex items-start gap-2 pt-0.5 shrink-0 ${
+                            className={`flex items-start pt-1 shrink-0 ${
                               isChildEligibleForInvite(child) ? "cursor-pointer" : "cursor-not-allowed opacity-50"
                             }`}
+                            title={
+                              isChildEligibleForInvite(child)
+                                ? "Include in bulk parent invite"
+                                : "Invitation already sent for this child"
+                            }
                           >
                             <input
                               type="checkbox"
-                              className="checkbox checkbox-primary checkbox-sm mt-0.5"
+                              className="checkbox checkbox-primary checkbox-sm"
                               checked={selectedChildIdsForBulk.has(childDocId(child))}
                               onChange={() => toggleBulkChild(child)}
                               disabled={!isChildEligibleForInvite(child)}
-                              title={
-                                isChildEligibleForInvite(child)
-                                  ? "Include in bulk parent invite"
-                                  : "Invitation already sent for this child"
-                              }
                             />
                           </label>
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <User className="w-5 h-5 text-primary" />
+                          </div>
                           <div className="min-w-0 flex-1">
-                            <h3 className="font-semibold text-base flex items-center gap-1">
-                              <span className="text-base-content/60">#{index + 1}</span>
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <span className="text-xs text-base-content/60">#{index + 1}</span>
                               <button
                                 onClick={() => navigate(`/data/child/${child._id || child.id}`)}
-                                className="link link-primary hover:underline"
+                                className="link link-primary font-semibold hover:underline truncate"
                               >
                                 {child.name}
                               </button>
-                              <ChevronRight className="w-4 h-4 flex-shrink-0" />
-                            </h3>
-                            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-sm text-base-content/70">
-                              <span>Age: {calculateAge(child.dateOfBirth)}</span>
-                              <span>Lang: {child.primaryLanguage}</span>
-                              <span>Center: {child.center || "—"}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              <span className="badge badge-outline badge-sm">
+                                {calculateAge(child.dateOfBirth)}
+                              </span>
+                              {child.primaryLanguage && (
+                                <span className="badge badge-info badge-sm">
+                                  {child.primaryLanguage}
+                                </span>
+                              )}
+                              {child.center && (
+                                <span className="badge badge-secondary badge-sm">
+                                  {child.center}
+                                </span>
+                              )}
                             </div>
                           </div>
-                          <div className="flex flex-wrap gap-1 justify-end">
-                            <button
-                              onClick={() => navigate(`/data/child/${child._id || child.id}`)}
-                              className="btn btn-ghost btn-xs"
+                        </div>
+                        <div className="flex flex-wrap gap-1 justify-end pt-3 mt-3 border-t border-base-300">
+                          <button
+                            onClick={() => navigate(`/data/child/${child._id || child.id}`)}
+                            className="btn btn-ghost btn-xs"
+                            title="View details"
+                          >
+                            View
+                            <ChevronRight className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => navigate(`/children/edit/${child._id || child.id}`)}
+                            className="btn btn-ghost btn-xs"
+                            title="Edit child"
+                          >
+                            <Edit className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteChild(child._id || child.id)}
+                            className="btn btn-ghost btn-xs text-error"
+                            title="Delete child"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                          {hasLinkedParentAccount(child) ? (
+                            <span
+                              className="btn btn-ghost btn-xs gap-1 no-animation pointer-events-none opacity-80 cursor-default border border-base-300"
+                              title="This child already has a linked parent account"
                             >
-                              View
-                            </button>
-                            <button
-                              onClick={() => navigate(`/children/edit/${child._id || child.id}`)}
-                              className="btn btn-ghost btn-xs"
+                              Parent linked
+                            </span>
+                          ) : invitedChildIds.has(String(child._id || child.id)) ? (
+                            <span
+                              className="btn btn-ghost btn-xs gap-1 no-animation pointer-events-none opacity-80 cursor-default border border-base-300"
+                              title="Invitation already sent for this child"
                             >
-                              <Edit className="w-3 h-3" />
-                            </button>
+                              Invited
+                            </span>
+                          ) : (
                             <button
-                              onClick={() => handleDeleteChild(child._id || child.id)}
-                              className="btn btn-ghost btn-xs text-error"
+                              type="button"
+                              onClick={() => openInviteModal(child)}
+                              className="btn btn-primary btn-xs gap-1"
+                              title="Send invitation to parent"
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <Mail className="w-3 h-3" />
+                              Invite
                             </button>
-                            {hasLinkedParentAccount(child) ? (
-                              <span className="btn btn-ghost btn-xs gap-1 no-animation pointer-events-none opacity-80 border border-base-300">
-                                Parent linked
-                              </span>
-                            ) : invitedChildIds.has(String(child._id || child.id)) ? (
-                              <span className="btn btn-ghost btn-xs gap-1 no-animation pointer-events-none opacity-80 border border-base-300">
-                                Invited
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openInviteModal(child)}
-                                className="btn btn-primary btn-xs gap-1"
-                              >
-                                <Mail className="w-3 h-3" />
-                                Invite
-                              </button>
-                            )}
-                          </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-              {/* Desktop: Table layout */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="table table-zebra">
-                  <thead>
-                    <tr>
-                      <th className="w-12">
-                        {bulkEligibleChildren.length > 0 ? (
+                  ))}
+                </div>
+              ) : (
+                /* Table mode — preserved structure from before; column
+                   headers are now buttons wired into `cycleChildrenSort`
+                   with `aria-sort` set per column. */
+                <div className="overflow-x-auto">
+                  <table className="table table-zebra">
+                    <thead>
+                      <tr>
+                        <th className="w-12">
+                          {bulkEligibleChildren.length > 0 ? (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs px-1 min-h-0 h-8"
+                              onClick={toggleSelectAllBulkEligible}
+                              title={allBulkEligibleSelected ? "Clear selection" : "Select all not yet invited"}
+                            >
+                              <CheckSquare className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <span className="text-base-content/40 text-xs" title="No children available for invite">
+                              —
+                            </span>
+                          )}
+                        </th>
+                        <th>#</th>
+                        <th aria-sort={childrenAriaSortFor("name")}>
                           <button
                             type="button"
-                            className="btn btn-ghost btn-xs px-1 min-h-0 h-8"
-                            onClick={toggleSelectAllBulkEligible}
-                            title={allBulkEligibleSelected ? "Clear selection" : "Select all not yet invited"}
+                            onClick={() => cycleChildrenSort("name")}
+                            className="flex items-center gap-1 hover:underline"
                           >
-                            <CheckSquare className="w-4 h-4" />
+                            Name
+                            {renderSortIcon("name", childrenSort)}
                           </button>
-                        ) : (
-                          <span className="text-base-content/40 text-xs" title="No children available for invite">
-                            —
-                          </span>
-                        )}
-                      </th>
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>
-                        <button
-                          type="button"
-                          onClick={() => handleSort('age')}
-                          className="flex items-center gap-1 hover:underline"
-                        >
-                          Age
-                          {sortBy === 'age' ? (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          type="button"
-                          onClick={() => handleSort('language')}
-                          className="flex items-center gap-1 hover:underline"
-                        >
-                          Language
-                          {sortBy === 'language' ? (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
-                        </button>
-                      </th>
-                      <th>
-                        <button
-                          type="button"
-                          onClick={() => handleSort('center')}
-                          className="flex items-center gap-1 hover:underline"
-                        >
-                          Center
-                          {sortBy === 'center' ? (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-50" />}
-                        </button>
-                      </th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredChildren.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan="7"
-                          className="text-center text-base-content/60"
-                        >
-                          No children found.
-                        </td>
+                        </th>
+                        <th aria-sort={childrenAriaSortFor("age")}>
+                          <button
+                            type="button"
+                            onClick={() => cycleChildrenSort("age")}
+                            className="flex items-center gap-1 hover:underline"
+                          >
+                            Age
+                            {renderSortIcon("age", childrenSort)}
+                          </button>
+                        </th>
+                        <th aria-sort={childrenAriaSortFor("language")}>
+                          <button
+                            type="button"
+                            onClick={() => cycleChildrenSort("language")}
+                            className="flex items-center gap-1 hover:underline"
+                          >
+                            Language
+                            {renderSortIcon("language", childrenSort)}
+                          </button>
+                        </th>
+                        <th aria-sort={childrenAriaSortFor("center")}>
+                          <button
+                            type="button"
+                            onClick={() => cycleChildrenSort("center")}
+                            className="flex items-center gap-1 hover:underline"
+                          >
+                            Center
+                            {renderSortIcon("center", childrenSort)}
+                          </button>
+                        </th>
+                        <th>Actions</th>
                       </tr>
-                    ) : (
-                      sortedChildren.map((child, index) => (
+                    </thead>
+                    <tbody>
+                      {sortedChildren.map((child, index) => (
                         <tr key={child._id || child.id} className="hover">
                           <td className="align-middle w-12">
                             {isChildEligibleForInvite(child) ? (
@@ -701,13 +739,13 @@ const DataPage = () => {
                           <td className="align-middle">{child.center || "—"}</td>
                           <td className="align-middle">
                             <div className="flex gap-2">
-                            <button
+                              <button
                                 onClick={() => navigate(`/data/child/${child._id || child.id}`)}
-                              className="btn btn-ghost btn-xs"
+                                className="btn btn-ghost btn-xs"
                                 title="View details"
-                            >
-                              View Details
-                            </button>
+                              >
+                                View Details
+                              </button>
                               <button
                                 onClick={() => navigate(`/children/edit/${child._id || child.id}`)}
                                 className="btn btn-ghost btn-xs"
@@ -750,11 +788,11 @@ const DataPage = () => {
                             </div>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
