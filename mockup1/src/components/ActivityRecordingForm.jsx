@@ -22,6 +22,12 @@ import { RAGColorLegend } from "../utils/RAGColorLegend.jsx";
 import { CUSTOM_ACTIVITY_VALUE } from "../utils/activities.js";
 import { getLocationsForRole, getDefaultLocationForRole } from "../utils/locations.js";
 import VettedLabelSelect from "./VettedLabelSelect.jsx";
+import {
+  MAX_RECORDING_MS,
+  initialReminderAt,
+  shouldShowReminder,
+  advanceReminder,
+} from "../utils/recordingReminder.js";
 
 const PROCESSING_MESSAGES = [
   { text: "Uploading your audio file...", icon: "📤" },
@@ -35,7 +41,6 @@ const PROCESSING_MESSAGES = [
   { text: "Almost there! Preparing your results...", icon: "🎯" },
 ];
 
-const MAX_RECORDING_MS = 5 * 60 * 1000;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 function formatElapsed(ms) {
@@ -102,10 +107,12 @@ export default function ActivityRecordingForm({
   const [recording, setRecording] = useState(false);
   const [recorderError, setRecorderError] = useState("");
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [showReminder, setShowReminder] = useState(false);
   const mediaRecorderRef = useRef(null);
   const recorderChunksRef = useRef([]);
   const mediaStreamRef = useRef(null);
   const timerRef = useRef(null);
+  const nextReminderAtRef = useRef(initialReminderAt());
 
   const [uploading, setUploading] = useState(false);
   const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
@@ -256,12 +263,19 @@ export default function ActivityRecordingForm({
       mediaRecorderRef.current = recorder;
       setRecording(true);
       setElapsedMs(0);
+      setShowReminder(false);
+      nextReminderAtRef.current = initialReminderAt();
       const started = Date.now();
       timerRef.current = setInterval(() => {
         const elapsed = Date.now() - started;
         setElapsedMs(elapsed);
         if (elapsed >= MAX_RECORDING_MS) {
           handleStopRecording();
+          return;
+        }
+        if (shouldShowReminder(elapsed, nextReminderAtRef.current)) {
+          nextReminderAtRef.current = advanceReminder(elapsed, nextReminderAtRef.current);
+          setShowReminder(true);
         }
       }, 250);
     } catch (error) {
@@ -276,6 +290,8 @@ export default function ActivityRecordingForm({
   };
 
   const handleStopRecording = () => {
+    setShowReminder(false);
+    nextReminderAtRef.current = initialReminderAt();
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -743,7 +759,7 @@ export default function ActivityRecordingForm({
         <div className="form-control w-full mb-3">
           <label className="label py-1">
             <span className="label-text font-semibold">Record audio</span>
-            <span className="label-text-alt">Up to 5 min</span>
+            <span className="label-text-alt">Up to 60 min</span>
           </label>
 
           {recording ? (
@@ -804,6 +820,52 @@ export default function ActivityRecordingForm({
             </p>
           )}
         </div>
+
+        {/* Still-recording reminder — the recorder keeps running underneath;
+            only the buttons (or the 60-min cap) can stop it. */}
+        {showReminder && recording && (
+          <div className="modal modal-open z-[200]">
+            <div className="modal-backdrop bg-black/50" aria-hidden="true" />
+            <div className="modal-box max-w-sm w-[92vw] sm:w-full relative z-[201] bg-base-100 p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="relative flex h-3 w-3 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-error" />
+                </span>
+                <h3 className="font-bold text-lg">Recording is still on</h3>
+              </div>
+              <p className="text-sm mb-1">
+                You have been recording for{" "}
+                <span className="font-mono font-semibold tabular-nums">
+                  {formatElapsed(elapsedMs)}
+                </span>
+                . Do you want to keep going?
+              </p>
+              <p className="text-xs text-base-content/60 mb-4">
+                Very long recordings may exceed the 25 MB upload limit and fail to
+                upload. Recording stops automatically at 60 minutes.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={handleStopRecording}
+                  className="btn btn-outline btn-error gap-2 w-full sm:w-auto"
+                >
+                  <Square className="w-4 h-4" />
+                  Stop recording
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReminder(false)}
+                  className="btn btn-primary gap-2 w-full sm:w-auto"
+                >
+                  <Mic className="w-4 h-4" />
+                  Keep recording
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Or upload a file */}
         <div className="form-control w-full mb-3">

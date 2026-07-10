@@ -141,4 +141,18 @@ describe("NotificationBell — routeTargetForNotification", () => {
             null
         );
     });
+
+    test("home-access-requested routes the parent to the child data page", () => {
+        assert.equal(
+            routeTargetForNotification({
+                type: "home-access-requested",
+                childId: "64b0000000000000000000c1",
+            }),
+            "/data/child/64b0000000000000000000c1"
+        );
+        assert.equal(
+            routeTargetForNotification({ type: "home-access-requested" }),
+            null
+        );
+    });
 });

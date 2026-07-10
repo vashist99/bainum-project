@@ -104,8 +104,19 @@ view, or use **My Child's Data** in the sidebar for charts and transcripts.
 **Audience: Parent**
 
 Only you, your child's assigned teachers (with active access), and program
-administrators can see your child's full assessment data. Other parents in the
-same classroom see only roster names, not other children's full records.
+administrators can see your child's **classroom** assessment data. **Home talk
+data** — recordings you make from the Home tab — is private to your family:
+teachers and administrators can never see it. Other parents in the same
+classroom see only roster names, not other children's full records.
+
+### What are the Home talk and Classroom talk views?
+
+**Audience: Parent**
+
+Your child's data page has two tabs: **Classroom talk** (recordings made at the
+program) and **Home talk** (recordings you make from the Home tab). Charts,
+words-per-minute stats, transcripts, and the combined download all follow the
+selected tab, so home and classroom talk are never mixed together.
 
 ### Why do I see "Access denied" or a blank page?
 
@@ -145,6 +156,16 @@ Teachers see school-oriented locations (Classroom, Playground, Excursion, etc.).
 Parents see routine/setting locations (Mealtime or snacks, Play/free play,
 Outdoor play, etc.). Custom locations are validated before saving.
 
+### How long can I record?
+
+**Audience: Teacher, Parent**
+
+In-browser recordings can run up to **60 minutes**. Every **15 minutes**, a
+pop-up reminds you the recording is still on and asks whether to keep recording
+or stop — recording continues uninterrupted until you choose or the 60-minute
+limit is reached. Note that very long recordings may exceed the **25 MB** upload
+limit; for long sessions, consider stopping and uploading in parts.
+
 ### What happens after I upload audio?
 
 **Audience: Teacher, Parent**
@@ -168,10 +189,11 @@ appears at the top, even if its recording date is earlier than an older upload.
 
 **Audience: Teacher, Parent**
 
-Yes. When a parent records from the **Home** tab, accepted transcripts appear on
-that child's data page. Classroom lead and assistant teachers (and admins) can
-review them there alongside classroom recordings. Full chart access may still
-require an active access grant; transcripts remain visible for supervised children.
+No. Home recordings are private to the family. When a parent records from the
+**Home** tab, accepted transcripts appear only in the parent's **Home talk**
+view on the child's data page. Teachers and administrators see classroom
+recordings only — home talk data is filtered out on the server, and it does not
+feed classroom charts or cohort thresholds.
 
 ### How long are transcripts kept?
 

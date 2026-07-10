@@ -160,9 +160,10 @@ capabilities with the lead teacher (add parents, record, remove children per pol
 2. Teachers automatically see every child they supervise (classroom roster plus
    any active access grants). The page shows **Viewing children at your school**
    as context; the list is not narrowed by school name matching.
-3. Open a child to view charts when you have full access; **transcripts** (including
-   parent **Home** recordings) are listed on the child data page for every child
-   you supervise in a classroom, even when chart access is still pending.
+3. Open a child to view charts when you have full access; **classroom transcripts**
+   are listed on the child data page for every child you supervise in a classroom,
+   even when chart access is still pending. Parent **Home** recordings are private
+   to the family and are never visible to teachers or administrators.
 4. Transcripts are sorted **newest first** — the latest upload appears at the top
    of the list and in combined downloads.
 5. On a child's data page, the **Classrooms** section shows enrollment by
@@ -177,7 +178,9 @@ capabilities with the lead teacher (add parents, record, remove children per pol
 2. Choose **location** (e.g., Classroom, Playground for teachers) and **activity**
    from the approved lists, or **Other** and enter a custom label (vetted by the
    system).
-3. Upload or record audio, then submit.
+3. Upload or record audio, then submit. In-browser recordings can run up to
+   **60 minutes**; after each **15 minutes** a pop-up reminds you the recording
+   is still on and offers **Keep recording** or **Stop recording**.
 4. Review the transcript when processing completes; accept or reject before it
    counts as a saved assessment.
 
@@ -202,11 +205,15 @@ Parents see **Dashboard** and **My Child's Data** in the sidebar (no separate
 ### Child data page
 
 1. After sign-in, open your child's page from the dashboard or direct link.
-2. View developmental charts, transcripts (newest first), recording history, and
+2. Switch between two views with the tabs at the top: **Classroom talk**
+   (recordings made at the program — the default) and **Home talk** (your Home
+   tab recordings). Charts, words-per-minute stats, transcripts (newest first),
+   and the combined download all follow the selected tab.
+3. View developmental charts, transcripts, recording history, and
    **Notes & Observations** for **your child only**.
-3. You cannot view other children's full records.
-4. Parent **Home** recordings appear here alongside classroom transcripts so
-   teachers and admins can review them in context.
+4. You cannot view other children's full records.
+5. **Home talk data is private to your family** — teachers and administrators
+   see classroom talk data only and can never view your home recordings.
 
 ### Enrolled classrooms (read-only)
 
@@ -224,7 +231,9 @@ Parents see **Dashboard** and **My Child's Data** in the sidebar (no separate
 1. Open the **Home** tab in the sidebar (not the Dashboard).
 2. Select **which child** the recording is for (required when you have more than one).
 3. Select **location** (e.g., Play/free play, Mealtime or snacks) and **activity**.
-4. Upload or record, then review the transcript when ready.
+4. Upload or record, then review the transcript when ready. Recordings can run
+   up to **60 minutes**; a reminder pop-up appears every **15 minutes** so you
+   can keep going or stop.
 
 ---
 

@@ -20,6 +20,21 @@ MAPPING = {
 }
 
 
+def _clean_inline_markdown(text: str) -> str:
+    """Strip Markdown inline syntax so Word output is plain stakeholder text."""
+    if not text:
+        return text
+    # [label](url) -> label
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    # **bold** / __bold__
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    # `code`
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    # stray markers (unbalanced ** from manual edits)
+    return text.replace("**", "").replace("__", "").replace("`", "")
+
+
 def build_with_pandoc(md_path: Path, out_path: Path) -> bool:
     cmd = ["pandoc", str(md_path), "-o", str(out_path)]
     if REFERENCE.exists():
@@ -38,12 +53,12 @@ def _add_markdown_table(doc, header_cells, rows):
     table.style = "Table Grid"
     hdr = table.rows[0].cells
     for i, text in enumerate(header_cells):
-        hdr[i].text = text.strip()
+        hdr[i].text = _clean_inline_markdown(text.strip())
     for r_idx, row in enumerate(rows):
         cells = table.rows[r_idx + 1].cells
         for c_idx, text in enumerate(row):
             if c_idx < len(cells):
-                cells[c_idx].text = text.strip()
+                cells[c_idx].text = _clean_inline_markdown(text.strip())
     doc.add_paragraph()
 
 
@@ -85,7 +100,7 @@ def build_with_python_docx(md_path: Path, out_path: Path) -> None:
         # Headings
         if stripped.startswith("#"):
             level = len(stripped) - len(stripped.lstrip("#"))
-            title = stripped[level:].strip()
+            title = _clean_inline_markdown(stripped[level:].strip())
             doc.add_heading(title, level=min(level, 4))
             i += 1
             continue
@@ -97,7 +112,7 @@ def build_with_python_docx(md_path: Path, out_path: Path) -> None:
                 items.append(re.sub(r"^[-*]\s+", "", lines[i].strip()))
                 i += 1
             for item in items:
-                doc.add_paragraph(item, style="List Bullet")
+                doc.add_paragraph(_clean_inline_markdown(item), style="List Bullet")
             continue
 
         # Numbered list
@@ -107,12 +122,12 @@ def build_with_python_docx(md_path: Path, out_path: Path) -> None:
                 items.append(re.sub(r"^\d+\.\s+", "", lines[i].strip()))
                 i += 1
             for item in items:
-                doc.add_paragraph(item, style="List Number")
+                doc.add_paragraph(_clean_inline_markdown(item), style="List Number")
             continue
 
         # Blockquote / emphasis line
         if stripped.startswith(">"):
-            p = doc.add_paragraph(stripped.lstrip("> ").strip())
+            p = doc.add_paragraph(_clean_inline_markdown(stripped.lstrip("> ").strip()))
             p.paragraph_format.left_indent = Pt(18)
             i += 1
             continue
@@ -131,7 +146,7 @@ def build_with_python_docx(md_path: Path, out_path: Path) -> None:
             para_lines.append(lines[i].strip())
             i += 1
         if para_lines:
-            doc.add_paragraph(" ".join(para_lines))
+            doc.add_paragraph(_clean_inline_markdown(" ".join(para_lines)))
 
     doc.save(out_path)
 

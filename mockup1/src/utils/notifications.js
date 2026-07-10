@@ -43,5 +43,9 @@ export function routeTargetForNotification(n) {
     if (n.type === "classroom-recording-added" && n.classroomId) {
         return `/classrooms/${n.classroomId}`;
     }
+    if (n.type === "home-access-requested" && n.childId) {
+        // Land the parent on the child page, where the sharing panel lives.
+        return `/data/child/${n.childId}`;
+    }
     return null;
 }
